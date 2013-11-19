@@ -1,7 +1,7 @@
-module Glmnet
+module GLMnet
 using DataFrames
 
-const libglmnet = joinpath(Pkg.dir("Glmnet"), "deps", "libglmnet.so")
+const libglmnet = joinpath(Pkg.dir("GLMnet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show
 export fit!, fit
@@ -60,7 +60,7 @@ function show(io::IO, X::CompressedPredictorMatrix)
     Base.showarray(io, convert(Matrix, X); header=false)
 end
 
-immutable GlmnetPath
+immutable GLMnetPath
     a0::Vector{Float64}             # intercept values for each solution
     betas::CompressedPredictorMatrix    # coefficient values for each solution
     dev_ratio::Vector{Float64}      # R^2 values for each solution
@@ -69,8 +69,8 @@ immutable GlmnetPath
                                     # data for all lamda values
 end
 
-function show(io::IO, g::GlmnetPath)
-    println(io, "Glmnet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
+function show(io::IO, g::GLMnetPath)
+    println(io, "GLMnet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
     print(DataFrame({g.betas.df, g.dev_ratio, g.λ}, ["df", "%dev", "λ"]))
 end
 
@@ -141,7 +141,7 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
         alm[1] = exp(2*log(alm[2])-log(alm[3]))
     end
     X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-    GlmnetPath(a0[1:lmu], X, rsq[1:lmu], alm[1:lmu], int(nlp[1]))
+    GLMnetPath(a0[1:lmu], X, rsq[1:lmu], alm[1:lmu], int(nlp[1]))
 end
 
 fit(X::StridedMatrix{Float64}, y::StridedVector{Float64}; kw...) = fit!(X, copy(y); kw...)
