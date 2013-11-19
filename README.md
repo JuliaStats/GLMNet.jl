@@ -65,6 +65,8 @@ julia> ans.betas
  0.0  -0.00992844  -0.0184835     -0.110947   -0.111015   -0.111077
 ```
 
+The intercepts along the solution path can be accessed as `path.a0`.
+
 ## TODO
 
 #### Soon
