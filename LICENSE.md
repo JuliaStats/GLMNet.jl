@@ -1,4 +1,4 @@
-The GLMnet.jl package is licensed under the GNU General Public License, Version 2:
+The GLMNet.jl package is licensed under the GNU General Public License, Version 2:
 
 > Copyright (c) 2013: Simon Kornblith.
 >

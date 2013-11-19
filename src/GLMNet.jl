@@ -1,7 +1,7 @@
-module GLMnet
+module GLMNet
 using DataFrames, Distributions
 
-const libglmnet = joinpath(Pkg.dir("GLMnet"), "deps", "libglmnet.so")
+const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show, Distributions.fit
 export fit!, fit, df
@@ -71,7 +71,7 @@ function show(io::IO, X::CompressedPredictorMatrix)
     Base.showarray(io, convert(Matrix, X); header=false)
 end
 
-immutable GLMnetPath
+immutable GLMNetPath
     family::Distribution
     a0::Vector{Float64}              # intercept values for each solution
     betas::CompressedPredictorMatrix # coefficient values for each solution
@@ -87,8 +87,8 @@ modeltype(::Binomial) = "Logistic"
 modeltype(::Multinomial) = "Multinomial"
 modeltype(::Poisson) = "Poisson"
 
-function show(io::IO, g::GLMnetPath)
-    println(io, "$(modeltype(g.family)) GLMnet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
+function show(io::IO, g::GLMNetPath)
+    println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
     print(DataFrame({df(g.betas), g.dev_ratio, g.λ}, ["df", "%dev", "λ"]))
 end
 
@@ -149,7 +149,7 @@ macro check_and_return()
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        GLMnetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
+        GLMNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
     end)
 end
 
@@ -171,9 +171,9 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
            Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
            Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
-          &(naivealgorithm ? 2 : 1), &alpha, &size(X, 1), &size(X, 2), X, y, weights, &0, penalty_factor,
-          constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
-          &intercept, &maxit, lmu, a0, ca, ia, nin, fdev, alm, nlp, jerr)
+          &(naivealgorithm ? 2 : 1), &alpha, &size(X, 1), &size(X, 2), X, y, weights, &0,
+          penalty_factor, constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol,
+          &standardize, &intercept, &maxit, lmu, a0, ca, ia, nin, fdev, alm, nlp, jerr)
 
     null_dev = 0.0
     mu = mean(y)

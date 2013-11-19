@@ -1,4 +1,4 @@
-using GLMnet, Distributions, Base.Test
+using GLMNet, Distributions, Base.Test
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
@@ -31,7 +31,6 @@ betas = [0.0000000000000000 -0.26106259863474601 -0.26999306570454373
 @test_approx_eq path.dev_ratio dev_ratio
 @test_approx_eq path.λ λ
 @test_approx_eq path.a0 a0
-
 @test_approx_eq path.betas[:, models] betas
 
 # Test consistency of indexing into compressed array
@@ -60,10 +59,6 @@ betas = [0.00000000000000000 -0.0066873359849929682 -0.0077845592006229557
          0.00000000000000000 -0.0043227868018046491 -0.0051301925856918635
          0.01281032818820803  0.0302846637885923545  0.0318823278949361619]
 
-# println(find(df .!= path.betas.df))
-# println([λ[39] path.λ[39]])
-# println([df path.betas.df])
-# println([λ path.λ])
 @test df(path.betas) == df_true
 @test_approx_eq path.dev_ratio dev_ratio
 @test_approx_eq path.λ λ

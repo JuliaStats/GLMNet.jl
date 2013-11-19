@@ -1,6 +1,6 @@
-# GLMnet
+# GLMNet
 
-[![Build Status](https://travis-ci.org/simonster/GLMnet.jl.png)](https://travis-ci.org/simonster/GLMnet.jl)
+[![Build Status](https://travis-ci.org/simonster/GLMNet.jl.png)](https://travis-ci.org/simonster/GLMNet.jl)
 
 [glmnet](http://www.jstatsoft.org/v33/i01/) is an R package by Jerome Friedman, Trevor Hastie, Rob Tibshirani that fits entire Lasso or ElasticNet regularization paths for linear, logistic, multinomial, and Cox models using cyclic coordinate descent. This Julia package wraps the Fortran code from glmnet.
 
@@ -10,7 +10,7 @@ To fit a basic model:
 
 ```julia
 julia> fit(rand(10, 5), rand(10))
-GLMnet Solution Path (64 solutions for 5 predictors in 333 passes):
+GLMNet Solution Path (64 solutions for 5 predictors in 333 passes):
 64x3 DataFrame:
          df      %dev           λ
 [1,]      0       0.0     0.13552
