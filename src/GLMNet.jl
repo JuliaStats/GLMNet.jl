@@ -100,7 +100,7 @@ function check_jerr(jerr, maxit)
     elseif jerr == 1000
         error("glmnet: all predictors are unpenalized")
     elseif -10001 < jerr < 0
-        warn("glment: convergence for $(jerr)th lambda value not reached after $maxit iterations")
+        warn("glment: convergence for $(-jerr)th lambda value not reached after $maxit iterations")
     elseif jerr < -10000
         warn("glmnet: number of non-zero coefficients along path exceeds $nx at $(maxit+10000)th lambda value")
     end
@@ -110,8 +110,6 @@ macro validate_and_init()
     esc(quote
         size(X, 1) == size(y, 1) ||
             error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
-        length(weights) == size(y, 1) ||
-            error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
         length(penalty_factor) == size(X, 2) ||
             error(Base.LinAlg.DimensionMismatch("length of penalty_factor must match rows in X"))
         (size(constraints, 1) == 2 && size(constraints, 2) == size(X, 2)) ||
@@ -164,6 +162,8 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
+    length(weights) == size(y, 1) ||
+        error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
 
     ccall((:elnet_, libglmnet), Void,
           (Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
@@ -181,6 +181,40 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
         null_dev += abs2(null_dev-mu)
     end
 
+    @check_and_return
+end
+
+function fit!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
+             family::Binomial;
+             offsets::StridedVector{Float64}=zeros(length(y)),
+             alpha::Real=1.0,
+             penalty_factor::Vector{Float64}=ones(size(X, 2)),
+             constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
+             dfmax::Int=size(X, 2), pmax::Int=min(dfmax*2+20, size(X, 2)), nlambda::Int=100,
+             lambda_min_ratio::Real=(length(y) < size(X, 2) ? 1e-2 : 1e-4),
+             lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
+             intercept::Bool=true, maxit::Int=1000000, algorithm::Symbol=:newtonraphson)
+    @validate_and_init
+    size(y, 2) == 2 || error("fit! for logistic models requires a two-column matrix with counts "*
+                             "of positive responses in the first column and negative responses "*
+                             "in the second")
+    kopt = algorithm == :newtonraphson ? 0 :
+           algorithm == :modifiednewtonraphson ? 1 :
+           algorithm == :nzsame ? 2 : error("unknown algorithm ")
+
+    null_dev = Array(Float64, 1)
+
+    ccall((:lognet_, libglmnet), Void,
+          (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
+           Ptr{Float64},  Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+          &alpha, &size(X, 1), &size(X, 2), &1, X, y, offsets, &0, penalty_factor,
+          constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
+          &intercept, &maxit, &kopt, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+
+    null_dev = null_dev[1]
     @check_and_return
 end
 
@@ -215,5 +249,13 @@ end
 fit(X::StridedMatrix{Float64}, y::StridedVector{Float64}, family=Normal(); kw...) =
     fit!(X, copy(y), family; kw...)
 fit(X::StridedMatrix, y::StridedVector, family=Normal(); kw...) =
+    fit(float64(X), float64(y), family)
+function fit(X::StridedMatrix{Float64}, y::StridedMatrix{Float64}, family::Binomial; kw...)
+    size(y, 2) == 2 || error("fit for logistic models requires a two-column matrix with counts "*
+                             "of negative responses in the first column and positive responses "*
+                             "in the second")
+    fit!(X, fliplr(y), family)
+end
+fit(X::StridedMatrix, y::StridedMatrix, family::Binomial; kw...) =
     fit(float64(X), float64(y), family)
 end # module
