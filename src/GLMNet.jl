@@ -1,5 +1,5 @@
 module GLMNet
-using DataFrames, Distributions, GLM, NumericExtensions
+using DataFrames, Distributions
 
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
@@ -107,29 +107,43 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
     y
 end
 
-type NormalDevResid <: TernaryFunctor end
-evaluate(::NormalDevResid,y,mu,wt) = wt*abs2(y-mu)
-devresid(::Normal) = NormalDevResid()
-devresid(::Binomial) = GLM.BinomialDevResid()
-devresid(::Poisson) = GLM.PoissonDevResid()
+abstract Loss
+immutable MSE <: Loss
+    y::Vector{Float64}
+end
+loss(l::MSE, i, mu) = abs2(l.y[i] - mu)
 
-# Compute loss for given model(s) with the predictors in X versus known
-# responses in y with the given weight
-function loss{T}(path::GLMNetPath, X::AbstractMatrix{T}, y::AbstractVector{T},
-                 weights::AbstractVector{T}, lossfun::TernaryFunctor=devresid(path.family),
-                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+immutable PoissonDeviance <: Loss
+    y::Vector{Float64}
+    fulldev::Vector{Float64}
+end
+PoissonDeviance(y::Vector{Float64}) =
+    PoissonDeviance(y, [y*log(y) - y for y in y])
+loss(l::PoissonDeviance, i, mu) = 2*(l.fulldev[i] - (l.y[i]*mu - exp(mu)))
+
+devloss(::Normal, y) = MSE(y)
+devloss(::Poisson, y) = PoissonDeviance(y)
+
+# Check the dimensions of X, y, and weights
+function validate_x_y_weights(X, y, weights)
     size(X, 1) == size(y, 1) ||
         error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
     length(weights) == size(y, 1) ||
         error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
+end
 
-    wsum = sum(weights)
+# Compute deviance for given model(s) with the predictors in X versus known
+# responses in y with the given weight
+function loss{T}(path::GLMNetPath, X::AbstractMatrix{T}, y::AbstractVector{T},
+                 weights::AbstractVector{T}, lossfun::Loss=devloss(path.family, y),
+                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+    validate_x_y_weights(X, y, weights)
     mu = predict(path, X, model)
     devs = zeros(size(mu, 2))
     for j = 1:size(mu, 2), i = 1:size(mu, 1)
-        devs[j] += evaluate(lossfun, y[i], mu[i, j], weights[i]/wsum)
+        devs[j] += loss(lossfun, i, mu[i, j])*weights[i]
     end
-    devs
+    devs/sum(weights)
 end
 
 modeltype(::Normal) = "Least Squares"
@@ -158,10 +172,7 @@ end
 
 macro validate_and_init()
     esc(quote
-        size(X, 1) == size(y, 1) ||
-            error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
-        length(weights) == size(y, 1) ||
-            error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
+        validate_x_y_weights(X, y, weights)
         length(penalty_factor) == size(X, 2) ||
             error(Base.LinAlg.DimensionMismatch("length of penalty_factor must match rows in X"))
         (size(constraints, 1) == 2 && size(constraints, 2) == size(X, 2)) ||
@@ -345,6 +356,9 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
     y = float64(y)
     path = glmnet(X, y, family; kw...)
 
+    # In case user defined folds
+    nfolds = maximum(folds)
+
     # We shouldn't pass on nlambda and lambda_min_ratio if the user
     # specified these, since that would make us throw errors, and this
     # is entirely determined by the lambda values we will pass
@@ -366,9 +380,33 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
              weights[holdoutidx])
     end
 
-    fitloss = hcat(fits...)
-    meanloss = vec(mean(fitloss, 2))
-    stdloss = vec(std(fitloss, 2))
+    fitloss = hcat(fits...)::Matrix{Float64}
+
+    ninfold = zeros(Int, nfolds)
+    for f in folds
+        ninfold[f] += 1
+    end
+
+    # Mean weighted by fold size
+    meanloss = zeros(size(fitloss, 1))
+    for j = 1:size(fitloss, 2)
+        wfold = ninfold[j]/length(folds)
+        for i = 1:size(fitloss, 1)
+            meanloss[i] += fitloss[i, j]*wfold
+        end
+    end
+
+    # Standard deviation weighted by fold size
+    stdloss = zeros(size(fitloss, 1))
+    for j = 1:size(fitloss, 2)
+        wfold = ninfold[j]
+        for i = 1:size(fitloss, 1)
+            stdloss[i] += abs2(fitloss[i, j] - meanloss[i])*wfold
+        end
+    end
+    for i = 1:size(fitloss, 1)
+        stdloss[i] = sqrt(stdloss[i]/length(folds)/(nfolds - 1))
+    end
 
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
 end
