@@ -1,10 +1,10 @@
 module GLMNet
-using DataFrames, Distributions
+using DataFrames, Distributions, GLM, NumericExtensions
 
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show
-export glmnet!, glmnet, df, predict
+export glmnet!, glmnet, df, predict, glmnetcv
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
     ni::Int
@@ -77,11 +77,13 @@ immutable GLMNetPath{F<:Distribution}
     betas::CompressedPredictorMatrix # coefficient values for each solution
     null_dev::Float64                # Null deviance of the model
     dev_ratio::Vector{Float64}       # R^2 values for each solution
-    λ::Vector{Float64}               # lamda values corresponding to each solution
+    lambda::Vector{Float64}          # lamda values corresponding to each solution
     npasses::Int                     # actual number of passes over the
                                      # data for all lamda values
 end
 
+# Compute the model response to predictors in X
+# No inverse link is applied
 function predict(path::GLMNetPath, X::AbstractMatrix,
                  model::Union(Int, AbstractVector{Int})=1:length(path.a0))
     betas = path.betas
@@ -105,6 +107,31 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
     y
 end
 
+type NormalDevResid <: TernaryFunctor end
+evaluate(::NormalDevResid,y,mu,wt) = wt*abs2(y-mu)
+devresid(::Normal) = NormalDevResid()
+devresid(::Binomial) = GLM.BinomialDevResid()
+devresid(::Poisson) = GLM.PoissonDevResid()
+
+# Compute loss for given model(s) with the predictors in X versus known
+# responses in y with the given weight
+function loss{T}(path::GLMNetPath, X::AbstractMatrix{T}, y::AbstractVector{T},
+                 weights::AbstractVector{T}, lossfun::TernaryFunctor=devresid(path.family),
+                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+    size(X, 1) == size(y, 1) ||
+        error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
+    length(weights) == size(y, 1) ||
+        error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
+
+    wsum = sum(weights)
+    mu = predict(path, X, model)
+    devs = zeros(size(mu, 2))
+    for j = 1:size(mu, 2), i = 1:size(mu, 1)
+        devs[j] += evaluate(lossfun, y[i], mu[i, j], weights[i]/wsum)
+    end
+    devs
+end
+
 modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
 modeltype(::Multinomial) = "Multinomial"
@@ -112,7 +139,7 @@ modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
-    print(DataFrame({df(g.betas), g.dev_ratio, g.λ}, ["df", "%dev", "λ"]))
+    print(DataFrame({df(g.betas), g.dev_ratio, g.lambda}, ["df", "%dev", "λ"]))
 end
 
 function check_jerr(jerr, maxit)
@@ -133,6 +160,8 @@ macro validate_and_init()
     esc(quote
         size(X, 1) == size(y, 1) ||
             error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
+        length(weights) == size(y, 1) ||
+            error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
         length(penalty_factor) == size(X, 2) ||
             error(Base.LinAlg.DimensionMismatch("length of penalty_factor must match rows in X"))
         (size(constraints, 1) == 2 && size(constraints, 2) == size(X, 2)) ||
@@ -174,9 +203,9 @@ macro check_and_return()
     end)
 end
 
-function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
+function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Normal=Normal();
-             weights::StridedVector{Float64}=ones(length(y)),
+             weights::Vector{Float64}=ones(length(y)),
              naivealgorithm::Bool=(size(X, 2) >= 500), alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
              constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
@@ -185,8 +214,6 @@ function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    length(weights) == size(y, 1) ||
-        error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
 
     ccall((:elnet_, libglmnet), Void,
           (Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
@@ -207,9 +234,10 @@ function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
     @check_and_return
 end
 
-function glmnet!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
+function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
-             offsets::StridedVector{Float64}=zeros(length(y)),
+             offsets::Vector{Float64}=zeros(size(y, 1)),
+             weights::Vector{Float64}=ones(size(y, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
              constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
@@ -218,14 +246,24 @@ function glmnet!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000, algorithm::Symbol=:newtonraphson)
     @validate_and_init
-    size(y, 2) == 2 || error("glmnet! for logistic models requires a two-column matrix with "*
-                             "counts of positive responses in the first column and negative "*
+    size(y, 2) == 2 || error("glmnet for logistic models requires a two-column matrix with "*
+                             "counts of negative responses in the first column and positive "*
                              "responses in the second")
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
 
     null_dev = Array(Float64, 1)
+
+    # The Fortran code expects positive responses in first column, but
+    # this convention is evidently unacceptable to the authors of the R
+    # code, and, apparently, to us
+    for i = 1:size(y, 1)
+        a = y[i, 1]
+        b = y[i, 2]
+        y[i, 1] = b*weights[i]
+        y[i, 2] = a*weights[i]
+    end
 
     ccall((:lognet_, libglmnet), Void,
           (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
@@ -241,10 +279,10 @@ function glmnet!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
     @check_and_return
 end
 
-function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
+function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Poisson;
-             offsets::StridedVector{Float64}=zeros(length(y)),
-             weights::StridedVector{Float64}=ones(length(y)),
+             offsets::Vector{Float64}=zeros(length(y)),
+             weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
              constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
@@ -253,8 +291,6 @@ function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    length(weights) == size(y, 1) ||
-        error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
     null_dev = Array(Float64, 1)
 
     ccall((:fishnet_, libglmnet), Void,
@@ -271,16 +307,69 @@ function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
     @check_and_return
 end
 
-glmnet(X::StridedMatrix{Float64}, y::StridedVector{Float64}, family=Normal(); kw...) =
+glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
     glmnet!(X, copy(y), family; kw...)
-glmnet(X::StridedMatrix, y::StridedVector, family=Normal(); kw...) =
+glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw...) =
     glmnet(float64(X), float64(y), family; kw...)
-function glmnet(X::StridedMatrix{Float64}, y::StridedMatrix{Float64}, family::Binomial; kw...)
-    size(y, 2) == 2 || error("glmnet for logistic models requires a two-column matrix with "*
-                             "counts of negative responses in the first column and positive "*
-                             "responses in the second")
-    glmnet!(X, fliplr(y), family; kw...)
+glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
+    glmnet!(X, copy(y), family; kw...)
+glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
+    glmnet(float64(X), float64(y), family; kw...)
+
+immutable GLMNetCrossValidation
+    path::GLMNetPath
+    nfolds::Int
+    lambda::Vector{Float64}
+    meanloss::Vector{Float64}
+    stdloss::Vector{Float64}
 end
-glmnet(X::StridedMatrix, y::StridedMatrix, family::Binomial; kw...) =
-    glmnet(float64(X), float64(y), family; kw...)
+
+function show(io::IO, cv::GLMNetCrossValidation)
+    g = cv.path
+    println(io, "$(modeltype(g.family)) GLMNet Cross Validation")
+    println(io, "$(length(cv.lambda)) models for $(size(g.betas, 1)) predictors in $(cv.nfolds) folds")
+    x, i = findmin(cv.meanloss)
+    @printf "Best λ %.3f (mean loss %.3f, std %.3f)" cv.lambda[i] x cv.stdloss[i]
+    print(io, )
+end
+
+function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
+                  family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
+                  nfolds::Int=min(10, div(size(y, 1), 3)),
+                  folds::Vector{Int}=begin
+                      n, r = divrem(size(y, 1), nfolds)
+                      shuffle!([rep(1:nfolds, n), 1:r])
+                  end, parallel::Bool=false, kw...)
+    # Fit full model once to determine parameters
+    X = float64(X)
+    y = float64(y)
+    path = glmnet(X, y, family; kw...)
+
+    # We shouldn't pass on nlambda and lambda_min_ratio if the user
+    # specified these, since that would make us throw errors, and this
+    # is entirely determined by the lambda values we will pass
+    for i = 1:length(kw)
+        kwname = kw[i][1]
+        if kwname == :nlambda || kwname == :lambda_min_ratio || kwname == :lambda
+            splice!(kw, i)
+        end
+    end
+
+    # Do model fits and compute loss for each
+    fits = (parallel ? pmap : map)(1:nfolds) do i
+        f = folds .== i
+        holdoutidx = find(f)
+        modelidx = find(!f)
+        g = glmnet(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                   weights=weights[modelidx], lambda=path.lambda, kw...)
+        loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
+             weights[holdoutidx])
+    end
+
+    fitloss = hcat(fits...)
+    meanloss = vec(mean(fitloss, 2))
+    stdloss = vec(std(fitloss, 2))
+
+    GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
+end
 end # module
