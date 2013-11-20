@@ -39,13 +39,11 @@ The intercepts along the solution path can be accessed as `path.a0`.
 
 #### Soon
 - Document all of glmnet's options here
-- Logistic, multinomial, and Cox models
-- Cross-validation
 - DataFrames integration
 
 #### Later
 - Sparse predictor matrices
-- Multiple responses
+- Multiple response, multinomial, and Cox models
 
 #### Someday
 - Non-canonical link functions
