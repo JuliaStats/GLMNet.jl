@@ -113,15 +113,35 @@ immutable MSE <: Loss
 end
 loss(l::MSE, i, mu) = abs2(l.y[i] - mu)
 
+immutable LogisticDeviance <: Loss
+    y::Matrix{Float64}
+    fulldev::Vector{Float64}    # Deviance of model with parameter for each y
+end
+LogisticDeviance(y::Matrix{Float64}) =
+    LogisticDeviance(y, [((y[i, 1] == 0.0 ? 0.0 : log(y[i, 1])) +
+                          (y[i, 2] == 0.0 ? 0.0 : log(y[i, 2]))) for i = 1:size(y, 1)])
+
+# These are hard-coded in the glmnet Fortran code
+const PMIN = 1e-5
+const PMAX = 1-1e-5
+function loss(l::LogisticDeviance, i, mu)
+    expmu = exp(mu)
+    lf = expmu/(expmu+1)
+    # 
+    lf = lf < PMIN ? PMIN : lf > PMAX ? PMAX : lf
+    2.0*(l.fulldev[i] - (l.y[i, 1]*log1p(-lf) + l.y[i, 2]*log(lf)))
+end
+
 immutable PoissonDeviance <: Loss
     y::Vector{Float64}
-    fulldev::Vector{Float64}
+    fulldev::Vector{Float64}    # Deviance of model with parameter for each y
 end
 PoissonDeviance(y::Vector{Float64}) =
     PoissonDeviance(y, [y*log(y) - y for y in y])
 loss(l::PoissonDeviance, i, mu) = 2*(l.fulldev[i] - (l.y[i]*mu - exp(mu)))
 
 devloss(::Normal, y) = MSE(y)
+devloss(::Binomial, y) = LogisticDeviance(y)
 devloss(::Poisson, y) = PoissonDeviance(y)
 
 # Check the dimensions of X, y, and weights
@@ -134,7 +154,8 @@ end
 
 # Compute deviance for given model(s) with the predictors in X versus known
 # responses in y with the given weight
-function loss{T}(path::GLMNetPath, X::AbstractMatrix{T}, y::AbstractVector{T},
+function loss{T}(path::GLMNetPath, X::AbstractMatrix{T},
+                 y::Union(AbstractVector{T}, AbstractMatrix{T}),
                  weights::AbstractVector{T}, lossfun::Loss=devloss(path.family, y),
                  model::Union(Int, AbstractVector{Int})=1:length(path.a0))
     validate_x_y_weights(X, y, weights)
