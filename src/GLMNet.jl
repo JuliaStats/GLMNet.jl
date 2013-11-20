@@ -4,7 +4,7 @@ using DataFrames, Distributions
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show
-export glmnet!, glmnet, df
+export glmnet!, glmnet, df, predict
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
     ni::Int
@@ -71,8 +71,8 @@ function show(io::IO, X::CompressedPredictorMatrix)
     Base.showarray(io, convert(Matrix, X); header=false)
 end
 
-immutable GLMNetPath
-    family::Distribution
+immutable GLMNetPath{F<:Distribution}
+    family::F
     a0::Vector{Float64}              # intercept values for each solution
     betas::CompressedPredictorMatrix # coefficient values for each solution
     null_dev::Float64                # Null deviance of the model
@@ -80,6 +80,29 @@ immutable GLMNetPath
     λ::Vector{Float64}               # lamda values corresponding to each solution
     npasses::Int                     # actual number of passes over the
                                      # data for all lamda values
+end
+
+function predict(path::GLMNetPath, X::AbstractMatrix,
+                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+    betas = path.betas
+    
+    if isa(model, Int)
+        y = rep(path.a0[model], size(X, 1))
+    else
+        y = repmat(path.a0[model].', size(X, 1), 1)
+    end
+
+    for b = 1:length(model)
+        m = model[b]
+        for i = 1:betas.nin[m]
+            ia = betas.ia[i]
+            for d = 1:size(X, 1)
+                y[d, b] += betas.ca[i, m]*X[d, ia]
+            end
+        end
+    end
+
+    y
 end
 
 modeltype(::Normal) = "Least Squares"
@@ -260,4 +283,12 @@ function glmnet(X::StridedMatrix{Float64}, y::StridedMatrix{Float64}, family::Bi
 end
 glmnet(X::StridedMatrix, y::StridedMatrix, family::Binomial; kw...) =
     glmnet(float64(X), float64(y), family; kw...)
+
+function glmnetcv(X::StridedMatrix, y::Union(StridedVector, StridedMatrix), family::Distribution;
+                  nfolds=min(10, div(size(y, 1), 2)), kw...)
+    # Fit full model once to determine parameters
+    g = glmnet(X, y, family; kw...)
+
+
+end
 end # module
