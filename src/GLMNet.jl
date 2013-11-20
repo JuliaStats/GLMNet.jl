@@ -92,7 +92,7 @@ function show(io::IO, g::GLMNetPath)
     print(DataFrame({df(g.betas), g.dev_ratio, g.λ}, ["df", "%dev", "λ"]))
 end
 
-function check_jerr(jerr)
+function check_jerr(jerr, maxit)
     if 0 < jerr < 7777
         error("glmnet: memory allocation error")
     elseif jerr == 7777
@@ -108,9 +108,9 @@ end
 
 macro validate_and_init()
     esc(quote
-        size(X, 1) == length(y) ||
+        size(X, 1) == size(y, 1) ||
             error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
-        length(weights) == length(y) ||
+        length(weights) == size(y, 1) ||
             error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
         length(penalty_factor) == size(X, 2) ||
             error(Base.LinAlg.DimensionMismatch("length of penalty_factor must match rows in X"))
@@ -141,7 +141,7 @@ end
 
 macro check_and_return()
     esc(quote
-        check_jerr(jerr[1])
+        check_jerr(jerr[1], maxit)
 
         lmu = lmu[1]
         # first lambda is infinity; changed to entry point
