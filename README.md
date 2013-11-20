@@ -9,7 +9,7 @@
 To fit a basic model:
 
 ```julia
-julia> fit(rand(10, 5), rand(10))
+julia> glmnet(rand(10, 5), rand(10))
 GLMNet Solution Path (64 solutions for 5 predictors in 333 passes):
 64x3 DataFrame:
          df      %dev           λ

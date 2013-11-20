@@ -3,8 +3,8 @@ using DataFrames, Distributions
 
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
-import Base.getindex, Base.convert, Base.size, Base.show, Distributions.fit
-export fit!, fit, df
+import Base.getindex, Base.convert, Base.size, Base.show
+export glmnet!, glmnet, df
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
     ni::Int
@@ -151,7 +151,7 @@ macro check_and_return()
     end)
 end
 
-function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
+function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
              family::Normal=Normal();
              weights::StridedVector{Float64}=ones(length(y)),
              naivealgorithm::Bool=(size(X, 2) >= 500), alpha::Real=1.0,
@@ -184,7 +184,7 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
     @check_and_return
 end
 
-function fit!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
+function glmnet!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
              family::Binomial;
              offsets::StridedVector{Float64}=zeros(length(y)),
              alpha::Real=1.0,
@@ -195,9 +195,9 @@ function fit!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000, algorithm::Symbol=:newtonraphson)
     @validate_and_init
-    size(y, 2) == 2 || error("fit! for logistic models requires a two-column matrix with counts "*
-                             "of positive responses in the first column and negative responses "*
-                             "in the second")
+    size(y, 2) == 2 || error("glmnet! for logistic models requires a two-column matrix with "*
+                             "counts of positive responses in the first column and negative "*
+                             "responses in the second")
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
@@ -218,7 +218,7 @@ function fit!(X::StridedMatrix{Float64}, y::StridedMatrix{Float64},
     @check_and_return
 end
 
-function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
+function glmnet!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
              family::Poisson;
              offsets::StridedVector{Float64}=zeros(length(y)),
              weights::StridedVector{Float64}=ones(length(y)),
@@ -248,16 +248,16 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
     @check_and_return
 end
 
-fit(X::StridedMatrix{Float64}, y::StridedVector{Float64}, family=Normal(); kw...) =
-    fit!(X, copy(y), family; kw...)
-fit(X::StridedMatrix, y::StridedVector, family=Normal(); kw...) =
-    fit(float64(X), float64(y), family)
-function fit(X::StridedMatrix{Float64}, y::StridedMatrix{Float64}, family::Binomial; kw...)
-    size(y, 2) == 2 || error("fit for logistic models requires a two-column matrix with counts "*
-                             "of negative responses in the first column and positive responses "*
-                             "in the second")
-    fit!(X, fliplr(y), family)
+glmnet(X::StridedMatrix{Float64}, y::StridedVector{Float64}, family=Normal(); kw...) =
+    glmnet!(X, copy(y), family; kw...)
+glmnet(X::StridedMatrix, y::StridedVector, family=Normal(); kw...) =
+    glmnet(float64(X), float64(y), family; kw...)
+function glmnet(X::StridedMatrix{Float64}, y::StridedMatrix{Float64}, family::Binomial; kw...)
+    size(y, 2) == 2 || error("glmnet for logistic models requires a two-column matrix with "*
+                             "counts of negative responses in the first column and positive "*
+                             "responses in the second")
+    glmnet!(X, fliplr(y), family; kw...)
 end
-fit(X::StridedMatrix, y::StridedMatrix, family::Binomial; kw...) =
-    fit(float64(X), float64(y), family)
+glmnet(X::StridedMatrix, y::StridedMatrix, family::Binomial; kw...) =
+    glmnet(float64(X), float64(y), family; kw...)
 end # module

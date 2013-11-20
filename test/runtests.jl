@@ -27,7 +27,7 @@ betas = [0.0000000000000000 -0.26106259863474601 -0.26999306570454373
          0.0000000000000000 -0.05815325804765525 -0.05965937657889149
          0.5705016364455693  1.04279276932443676  1.07097251257554626]
 
-path = fit(X, y)
+path = glmnet(X, y)
 @test df(path.betas) == df_true
 @test_approx_eq path.dev_ratio dev_ratio
 @test_approx_eq path.λ λ
@@ -47,7 +47,7 @@ betas = [0.00000000000000000  0.0000000000000000  0.0000000000000000000
          0.00000000000000000  0.0000000000000000 -0.0001247956998235217
          0.04118567893498771  0.1609132092629401  0.1892922463930407362]
 
-path = fit(X, float64(yl), Binomial())
+path = glmnet(X, float64(yl), Binomial())
 @test df(path.betas) == df_true
 @test_approx_eq path.dev_ratio dev_ratio
 @test_approx_eq path.λ λ
@@ -66,7 +66,7 @@ betas = [0.00000000000000000 -0.0066873359849929682 -0.0077845592006229557
          0.00000000000000000 -0.0043227868018046491 -0.0051301925856918635
          0.01281032818820803  0.0302846637885923545  0.0318823278949361619]
 
-path = fit(X, y, Poisson())
+path = glmnet(X, y, Poisson())
 @test df(path.betas) == df_true
 @test_approx_eq path.dev_ratio dev_ratio
 @test_approx_eq path.λ λ
