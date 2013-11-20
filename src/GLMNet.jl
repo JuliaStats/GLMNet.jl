@@ -230,6 +230,8 @@ function fit!(X::StridedMatrix{Float64}, y::StridedVector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
+    length(weights) == size(y, 1) ||
+        error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
     null_dev = Array(Float64, 1)
 
     ccall((:fishnet_, libglmnet), Void,
