@@ -283,12 +283,4 @@ function glmnet(X::StridedMatrix{Float64}, y::StridedMatrix{Float64}, family::Bi
 end
 glmnet(X::StridedMatrix, y::StridedMatrix, family::Binomial; kw...) =
     glmnet(float64(X), float64(y), family; kw...)
-
-function glmnetcv(X::StridedMatrix, y::Union(StridedVector, StridedMatrix), family::Distribution;
-                  nfolds=min(10, div(size(y, 1), 2)), kw...)
-    # Fit full model once to determine parameters
-    g = glmnet(X, y, family; kw...)
-
-
-end
 end # module
