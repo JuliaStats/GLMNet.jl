@@ -84,22 +84,22 @@ end
 
 # Compute the model response to predictors in X
 # No inverse link is applied
+makepredictmat(path::GLMNetPath, sz::Int, model::Int) = rep(path.a0[model], sz)
+makepredictmat(path::GLMNetPath, sz::Int, model::Range1{Int}) = repmat(path.a0[model].', sz, 1)
 function predict(path::GLMNetPath, X::AbstractMatrix,
                  model::Union(Int, AbstractVector{Int})=1:length(path.a0))
     betas = path.betas
+    ca = betas.ca
+    ia = betas.ia
+    nin = betas.nin
     
-    if isa(model, Int)
-        y = rep(path.a0[model], size(X, 1))
-    else
-        y = repmat(path.a0[model].', size(X, 1), 1)
-    end
-
+    y = makepredictmat(path, size(X, 1), model)
     for b = 1:length(model)
         m = model[b]
-        for i = 1:betas.nin[m]
-            ia = betas.ia[i]
+        for i = 1:nin[m]
+            iia = ia[i]
             for d = 1:size(X, 1)
-                y[d, b] += betas.ca[i, m]*X[d, ia]
+                y[d, b] += ca[i, m]*X[d, iia]
             end
         end
     end
@@ -127,7 +127,6 @@ const PMAX = 1-1e-5
 function loss(l::LogisticDeviance, i, mu)
     expmu = exp(mu)
     lf = expmu/(expmu+1)
-    # 
     lf = lf < PMIN ? PMIN : lf > PMAX ? PMAX : lf
     2.0*(l.fulldev[i] - (l.y[i, 1]*log1p(-lf) + l.y[i, 2]*log(lf)))
 end
