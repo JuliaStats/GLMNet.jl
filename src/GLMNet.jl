@@ -344,11 +344,11 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
 end
 
 glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
-    glmnet!(X, copy(y), family; kw...)
+    glmnet!(copy(X), copy(y), family; kw...)
 glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw...) =
     glmnet(float64(X), float64(y), family; kw...)
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
-    glmnet!(X, copy(y), family; kw...)
+    glmnet!(copy(X), copy(y), family; kw...)
 glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
     glmnet(float64(X), float64(y), family; kw...)
 
@@ -399,8 +399,8 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
         f = folds .== i
         holdoutidx = find(f)
         modelidx = find(!f)
-        g = glmnet(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
-                   weights=weights[modelidx], lambda=path.lambda, kw...)
+        g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                    weights=weights[modelidx], lambda=path.lambda, kw...)
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
              weights[holdoutidx])
     end
