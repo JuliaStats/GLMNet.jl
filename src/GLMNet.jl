@@ -136,7 +136,7 @@ immutable PoissonDeviance <: Loss
     fulldev::Vector{Float64}    # Deviance of model with parameter for each y
 end
 PoissonDeviance(y::Vector{Float64}) =
-    PoissonDeviance(y, [y*log(y) - y for y in y])
+    PoissonDeviance(y, [y == 0.0 ? 0.0 : y*log(y) - y for y in y])
 loss(l::PoissonDeviance, i, mu) = 2*(l.fulldev[i] - (l.y[i]*mu - exp(mu)))
 
 devloss(::Normal, y) = MSE(y)
@@ -153,18 +153,25 @@ end
 
 # Compute deviance for given model(s) with the predictors in X versus known
 # responses in y with the given weight
-function loss{T}(path::GLMNetPath, X::AbstractMatrix{T},
-                 y::Union(AbstractVector{T}, AbstractMatrix{T}),
-                 weights::AbstractVector{T}, lossfun::Loss=devloss(path.family, y),
-                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
+              y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
+              weights::AbstractVector{Float64}=ones(size(y, 1)),
+              lossfun::Loss=devloss(path.family, y),
+              model::Union(Int, AbstractVector{Int})=1:length(path.a0))
     validate_x_y_weights(X, y, weights)
     mu = predict(path, X, model)
     devs = zeros(size(mu, 2))
     for j = 1:size(mu, 2), i = 1:size(mu, 1)
         devs[j] += loss(lossfun, i, mu[i, j])*weights[i]
+        if isnan(devs[j])
+            error("NaN after loss for $i, $(mu[i, j])")
+        end
     end
     devs/sum(weights)
 end
+loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
+     weights::AbstractVector=ones(size(y, 1)), va...) =loss(path, float64(X), float64(y),
+                                                            float64(weights), va...)
 
 modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
