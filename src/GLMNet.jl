@@ -163,9 +163,6 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
     devs = zeros(size(mu, 2))
     for j = 1:size(mu, 2), i = 1:size(mu, 1)
         devs[j] += loss(lossfun, i, mu[i, j])*weights[i]
-        if isnan(devs[j])
-            error("NaN after loss for $i, $(mu[i, j])")
-        end
     end
     devs/sum(weights)
 end
