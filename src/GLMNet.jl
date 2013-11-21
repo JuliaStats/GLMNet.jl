@@ -4,7 +4,7 @@ using DataFrames, Distributions
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show
-export glmnet!, glmnet, df, predict, glmnetcv
+export glmnet!, glmnet, nactive, predict, glmnetcv
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
     ni::Int
@@ -47,8 +47,9 @@ function getindex(X::CompressedPredictorMatrix, a::Union(Int, AbstractVector{Int
     out
 end
 
+# Get number of active predictors for each model in X
 # nin can be > non-zero predictors under some circumstances...
-function df(X::CompressedPredictorMatrix)
+function nactive(X::CompressedPredictorMatrix)
     [begin
         n = 0
         for i = 1:X.nin[j]
