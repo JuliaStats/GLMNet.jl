@@ -178,7 +178,7 @@ modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
-    print(DataFrame({df(g.betas), g.dev_ratio, g.lambda}, ["df", "%dev", "λ"]))
+    print(io, DataFrame({nactive(g.betas), g.dev_ratio, g.lambda}, ["df", "%dev", "λ"]))
 end
 
 function check_jerr(jerr, maxit)
@@ -365,7 +365,7 @@ function show(io::IO, cv::GLMNetCrossValidation)
     println(io, "$(modeltype(g.family)) GLMNet Cross Validation")
     println(io, "$(length(cv.lambda)) models for $(size(g.betas, 1)) predictors in $(cv.nfolds) folds")
     x, i = findmin(cv.meanloss)
-    @printf "Best λ %.3f (mean loss %.3f, std %.3f)" cv.lambda[i] x cv.stdloss[i]
+    @printf io "Best λ %.3f (mean loss %.3f, std %.3f)" cv.lambda[i] x cv.stdloss[i]
     print(io, )
 end
 
