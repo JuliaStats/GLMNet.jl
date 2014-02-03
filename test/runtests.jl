@@ -114,7 +114,7 @@ show(IOBuffer(), cv.path)
 
 ## COMPRESSEDPREDICTORMATRIX
 betas = path.betas
-cbetas = convert(Matrix, path.betas)
+cbetas = convert(Matrix{Float64}, path.betas)
 for j = 1:size(betas, 2), i = 1:size(betas, 1)
     @assert betas[i, j] == cbetas[i, j]
     @assert betas[1:i, j] == cbetas[1:i, j]
