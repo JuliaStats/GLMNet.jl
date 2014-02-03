@@ -10,4 +10,4 @@ before_install:
   - sudo apt-get install libpcre3-dev julia -y
 script:
   - julia -e 'Pkg.init(); run(`ln -s $(pwd()) $(Pkg.dir("GLMNet"))`); Pkg.pin("GLMNet"); Pkg.resolve()'
-  - julia -e 'using GLMNet; @assert isdefined(:GLMNet); @assert typeof(GLMNet) === Module'
+  - julia test/runtests.jl
