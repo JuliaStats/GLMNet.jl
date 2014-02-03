@@ -18,7 +18,7 @@ julia> X = [1:100 (1:100)+randn(100)*5 (1:100)+randn(100)*10 (1:100)+randn(100)*
 julia> path = glmnet(X, y)
 Least Squares GLMNet Solution Path (55 solutions for 4 predictors in 163 passes):
 55x3 DataFrame:
-         df     %dev        λ
+         df  pct_dev        λ
 [1,]      0      0.0  27.1988
 [2,]      1 0.154843  24.7825
 [3,]      1 0.283396  22.5809
