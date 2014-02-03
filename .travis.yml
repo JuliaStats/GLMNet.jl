@@ -9,5 +9,5 @@ before_install:
   - sudo apt-get update -qq -y
   - sudo apt-get install libpcre3-dev julia gfortran -y
 script:
-  - julia -e 'versioninfo(); Pkg.init(); Pkg.clone(pwd());'
+  - julia -e 'versioninfo(); Pkg.init(); Pkg.clone(pwd()); Pkg.build("GLMNet")'
   - julia test/runtests.jl
