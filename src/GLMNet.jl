@@ -85,7 +85,7 @@ end
 
 # Compute the model response to predictors in X
 # No inverse link is applied
-makepredictmat(path::GLMNetPath, sz::Int, model::Int) = rep(path.a0[model], sz)
+makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::Range1{Int}) = repmat(path.a0[model].', sz, 1)
 function predict(path::GLMNetPath, X::AbstractMatrix,
                  model::Union(Int, AbstractVector{Int})=1:length(path.a0))
@@ -374,7 +374,7 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
-                      shuffle!([rep(1:nfolds, n), 1:r])
+                      shuffle!([repmat(1:nfolds, n), 1:r])
                   end, parallel::Bool=false, kw...)
     # Fit full model once to determine parameters
     X = float64(X)
