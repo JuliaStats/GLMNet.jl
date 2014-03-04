@@ -387,11 +387,9 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
     # We shouldn't pass on nlambda and lambda_min_ratio if the user
     # specified these, since that would make us throw errors, and this
     # is entirely determined by the lambda values we will pass
-    for i = 1:length(kw)
-        kwname = kw[i][1]
-        if kwname == :nlambda || kwname == :lambda_min_ratio || kwname == :lambda
-            splice!(kw, i)
-        end
+    filter!(kw) do akw
+        kwname = akw[1]
+        kwname != :nlambda && kwname != :lambda_min_ratio && kwname != :lambda
     end
 
     # Do model fits and compute loss for each
