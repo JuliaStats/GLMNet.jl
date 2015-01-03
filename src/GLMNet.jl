@@ -4,19 +4,19 @@ using DataFrames, Distributions
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show
-export glmnet!, glmnet, nactive, predict, glmnetcv
+export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
-    ni::Int
-    ca::Matrix{Float64}
-    ia::Vector{Int32}
-    nin::Vector{Int32}
+    ni::Int               # Number of predictors
+    ca::Matrix{Float64}   # Predictor values
+    ia::Vector{Int32}     # Predictor indices
+    nin::Vector{Int32}    # Number of predictors in each solution
 end
 
 size(X::CompressedPredictorMatrix) = (X.ni, length(X.nin))
 
 function getindex(X::CompressedPredictorMatrix, a::Int, b::Int)
-    a <= X.ni && b <= length(X.nin) || throw(BoundsError())
+    checkbounds(X, a, b)
     for i = 1:X.nin[b]
         if X.ia[i] == a
             return X.ca[i, b]
@@ -47,17 +47,17 @@ function getindex(X::CompressedPredictorMatrix, a::Union(Int, AbstractVector{Int
     out
 end
 
-# Get number of active predictors for each model in X
+# Get number of active predictors for a model in X
 # nin can be > non-zero predictors under some circumstances...
-function nactive(X::CompressedPredictorMatrix)
-    [begin
-        n = 0
-        for i = 1:X.nin[j]
-            n += X.ca[i, j] != 0
-        end
-        n
-    end for j = 1:length(X.nin)]
+function nactive(X::CompressedPredictorMatrix, b::Int)
+    n = 0
+    for i = 1:X.nin[b]
+        n += X.ca[i, b] != 0
+    end
+    n
 end
+nactive(X::CompressedPredictorMatrix, b::AbstractVector{Int}=1:length(X.nin)) =
+    [nactive(X, j) for j in b]
 
 function convert{T<:Matrix{Float64}}(::Type{T}, X::CompressedPredictorMatrix)
     mat = zeros(X.ni, length(X.nin))
@@ -214,7 +214,7 @@ macro validate_and_init()
         end
 
         lmu = Int32[0]
-        a0 = Array(Float64, nlambda)
+        a0 = zeros(Float64, nlambda)
         ca = Array(Float64, pmax, nlambda)
         ia = Array(Int32, pmax)
         nin = Array(Int32, nlambda)
