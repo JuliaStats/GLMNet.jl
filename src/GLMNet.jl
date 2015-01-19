@@ -272,7 +272,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
-             offsets::Vector{Float64}=zeros(size(y, 1)),
+             offsets::Union(Vector{Float64}, Nothing)=nothing,
              weights::Vector{Float64}=ones(size(y, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -288,6 +288,8 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
+    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(size(y, 1)) : copy(offsets)
+    length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
     null_dev = Array(Float64, 1)
 
@@ -307,7 +309,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
            Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
-          &alpha, &size(X, 1), &size(X, 2), &1, X, y, offsets, &0, penalty_factor,
+          &alpha, &size(X, 1), &size(X, 2), &1, X, y, copy(offsets), &0, penalty_factor,
           constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
           &intercept, &maxit, &kopt, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
 
@@ -317,7 +319,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Poisson;
-             offsets::Vector{Float64}=zeros(length(y)),
+             offsets::Union(Vector{Float64}, Nothing)=nothing,
              weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -328,6 +330,9 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
     null_dev = Array(Float64, 1)
+
+    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(length(y)) : copy(offsets)
+    length(offsets) == length(y) || error("length of offsets must match length of y")
 
     ccall((:fishnet_, libglmnet), Void,
           (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
