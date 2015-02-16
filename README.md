@@ -88,14 +88,10 @@ julia> cv.path.betas[:, 48]
  - `intercept`: Whether to fit an intercept term. The intercept is always unpenalized. Defaults to `true`.
  - `maxit`: The maximum number of iterations of the cyclic coordinate descent algorithm. If convergence is not achieved, a warning is returned.
 
-## TODO
 
-#### Soon
-- DataFrames integration
+## See also
 
-#### Later
-- Sparse predictor matrices
-- Multiple response, multinomial, and Cox models
-
-#### Someday
-- Non-canonical link functions
+ - [Lasso.jl](https://github.com/simonster/Lasso.jl), a pure Julia implementation of the glmnet coordinate descent algorithm that often achieves better performance.
+ - [LARS.jl](https://github.com/simonster/LARS.jl), an implementation
+   of least angle regression for fitting entire linear (but not
+   generalized linear) Lasso and Elastic Net coordinate paths.
