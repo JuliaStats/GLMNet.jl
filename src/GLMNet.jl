@@ -270,6 +270,21 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
     @check_and_return
 end
 
+function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
+             family::Binomial;
+             kw...)
+    n = length(y)
+    newy = zeros(n, 2)
+    for i in 1:n
+        if y[i] == 0.0
+            newy[i, 1], newy[i, 2] = 1, 0
+        else
+            newy[i, 1], newy[i, 2] = 0, 1
+        end
+    end
+    return glmnet!(X, newy, family, kw...)
+end
+
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
              offsets::Union(Vector{Float64}, Nothing)=nothing,
@@ -355,7 +370,11 @@ glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw..
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
-    glmnet(float64(X), float64(y), family; kw...)
+    glmnet!(float64(X), float64(y), family; kw...)
+glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Binomial; kw...) =
+    glmnet!(copy(X), copy(y), family; kw...)
+glmnet(X::Matrix, y::Vector, family::Binomial; kw...) =
+    glmnet!(float64(X), float64(y), family; kw...)
 
 immutable GLMNetCrossValidation
     path::GLMNetPath
