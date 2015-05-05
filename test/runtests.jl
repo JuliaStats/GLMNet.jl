@@ -58,7 +58,7 @@ betas = [0.00000000000000000  0.0000000000000000  0.0000000000000000000
          0.00000000000000000  0.0000000000000000  0.0000000000000000000
          0.00000000000000000  0.0000000000000000 -0.0001247956998235217
          0.04118567893498771  0.1609132092629401  0.1892922463930407362]
-path = glmnet(X, float64(yl), Binomial())
+path = glmnet(X, convert(Matrix{Float64}, yl), Binomial())
 @test nactive(path.betas) == df_true
 @test_approx_eq path.dev_ratio dev_ratio
 @test_approx_eq path.lambda lambda

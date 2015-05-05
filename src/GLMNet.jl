@@ -1,5 +1,5 @@
 module GLMNet
-using DataFrames, Distributions
+using DataFrames, Distributions, Compat
 
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
@@ -86,7 +86,7 @@ end
 # Compute the model response to predictors in X
 # No inverse link is applied
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
-makepredictmat(path::GLMNetPath, sz::Int, model::Range1{Int}) = repmat(path.a0[model].', sz, 1)
+makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repmat(path.a0[model].', sz, 1)
 function predict(path::GLMNetPath, X::AbstractMatrix,
                  model::Union(Int, AbstractVector{Int})=1:length(path.a0))
     betas = path.betas
@@ -168,8 +168,9 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
     devs/sum(weights)
 end
 loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
-     weights::AbstractVector=ones(size(y, 1)), va...) =loss(path, float64(X), float64(y),
-                                                            float64(weights), va...)
+     weights::AbstractVector=ones(size(y, 1)), va...) =
+  loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
+       convert(Vector{Float64}, weights), va...)
 
 modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
@@ -235,7 +236,7 @@ macro check_and_return()
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        GLMNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
+        GLMNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], @compat Int(nlp[1]))
     end)
 end
 
@@ -351,11 +352,11 @@ end
 glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw...) =
-    glmnet(float64(X), float64(y), family; kw...)
+    glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), family; kw...)
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
-    glmnet(float64(X), float64(y), family; kw...)
+    glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
 immutable GLMNetCrossValidation
     path::GLMNetPath
@@ -379,11 +380,11 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
-                      shuffle!([repmat(1:nfolds, n), 1:r])
+                      shuffle!([repmat(1:nfolds, n); 1:r])
                   end, parallel::Bool=false, kw...)
     # Fit full model once to determine parameters
-    X = float64(X)
-    y = float64(y)
+    X = convert(Matrix{Float64}, X)
+    y = convert(Array{Float64}, y)
     path = glmnet(X, y, family; kw...)
 
     # In case user defined folds
