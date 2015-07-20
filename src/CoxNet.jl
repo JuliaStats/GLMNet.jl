@@ -16,12 +16,11 @@ immutable CoxNetPath
                                      # data for all lamda values
 end
 
-function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
-              y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
-              weights::AbstractVector{Float64}=ones(size(y, 1)),
-              model::Union(Int, AbstractVector{Int})=1:length(path.a0))
-    validate_x_y_weights(X, y, weights)
-    risk = exp(predict(path, X, model))
+function coxDeviance(risk::Array, y::Matrix{Float64}, 
+              weights::AbstractVector{Float64}=ones(size(y, 1))) 
+	order = sortperm(y[:, 1])
+	y = y[order,:]
+	risk = risk[order, :]
     devs = zeros(size(risk, 2))
 	for j = 1:size(risk, 2)
 		rsk = risk[:, j] .* weights;
@@ -29,11 +28,22 @@ function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
 		for i = size(risk, 1):-1:1
 			cumrsk += rsk[i]
 			if y[i, 2] == 1
-				dev[j] += log(rsk[i]) - log(cumrsk)
+				devs[j] += log(rsk[i]) - log(cumrsk)
 			end
 		end
 	end
-    return -devs
+    return devs
+end
+	
+
+function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
+              y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
+              weights::AbstractVector{Float64}=ones(size(y, 1)),
+              model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+    validate_x_y_weights(X, y, weights)
+    risk = exp(predict(path, X, model))
+	devs = coxDeviance(risk, y, weights)
+    return -devs/sum(y[:, 2])
 end
 
 loss(path::CoxNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
@@ -47,7 +57,6 @@ modeltype(::CoxPH) = "Cox's Proportional Model"
 macro check_and_return_cox()
     esc(quote
         check_jerr(jerr[1], maxit)
-
         lmu = lmu[1]
         # first lambda is infinity; changed to entry point
         if isempty(lambda) && length(alm) > 2
@@ -60,7 +69,7 @@ end
 
 
 
-function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPL;
+function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPH;
              offsets::Union(Vector{Float64}, Nothing)=nothing,
              weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
@@ -89,36 +98,89 @@ function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPL;
 	null_dev = 0.0;
 	jd = int32(0);
 	#
-	ca = zeros(Float64, pmax, nlambda)
-	ia = zeros(Int32, pmax)
-	nin = zeros(Int32, nlambda)
+	ca = zeros(Float64, pmax, nlambda) # fitted coef/param
+	ia = zeros(Int32, pmax) # param order
+	nin = zeros(Int32, nlambda) # 
 	fdev = zeros(Float64, nlambda)
 	alm = zeros(Float64, nlambda)
 	#
     offsets = isa(offsets, Nothing) ? zeros(length(times)) : copy(offsets)
     length(offsets) == length(times) || error("length of offsets must match length of y")
 	#
-	ccall((:coxnet_, libglmnet), Void, 
-		(
-			Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} ,
-			Ptr{Float64} , Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} ,
-			Ptr{Int32}   , Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   ,
-			Ptr{Int32}   , Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} ,
-			Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Int32}   ,
-			Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} ,
-			Ptr{Float64} , Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}
-		),
-			&alpha       , &nobs          , &nvars            , X            ,
-			times        , status         , offsets           , weights      ,
-			&jd          , penalty_factor , constraints       , &dfmax       ,
-			&pmax        , &nlambda       , &lambda_min_ratio , lambda       ,
-			&tol         , &maxit         , &standardize      , lmu          ,
-			ca           , ia             , nin               , &null_dev    ,
-			fdev         , alm            , nlp               , jerr
-		)
+    ccall((:coxnet_, libglmnet), Void, (
+        Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} , # 1
+        Ptr{Float64} , Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} , # 2
+        Ptr{Int32}   , Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   , # 3
+        Ptr{Int32}   , Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , # 4
+        Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Int32}   , # 5
+        Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} , # 6
+        Ptr{Float64} , Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}     # 7
+        ),
+        &alpha       , &nobs          , &nvars            , X            , # 1
+        times        , status         , offsets           , weights      , # 2
+        &jd          , penalty_factor , constraints       , &dfmax       , # 3
+        &pmax        , &nlambda       , &lambda_min_ratio , lambda       , # 4
+        &tol         , &maxit         , &standardize      , lmu          , # 5
+        ca           , ia             , nin               , &null_dev    , # 6
+        fdev         , alm            , nlp               , jerr           # 7
+        )
     @check_and_return_cox
 end
 
 
-glmnet(X::Matrix{Float64}, y::Matrix, family::CoxPL; kw...) =
+glmnet(X::Matrix{Float64}, y::Matrix, family::CoxPH; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
+
+
+
+predict(path::CoxNetPath, X::AbstractMatrix, args...) = X * path.ca
+
+
+function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
+                  family::CoxPH; weights::Vector{Float64}=ones(size(X,1)),
+				  grouped = true,
+                  nfolds::Int=min(10, div(size(y, 1), 3)),
+                  folds::Vector{Int}=begin
+                      n, r = divrem(size(y, 1), nfolds)
+                      shuffle!([repmat(1:nfolds, n); 1:r])
+                  end, parallel::Bool=false, kw...)
+    # Fit full model once to determine parameters
+    X = convert(Matrix{Float64}, X)
+    y = convert(Matrix{Float64}, y)
+    path = glmnet(X, y, family; kw...)
+
+    # In case user defined folds
+    nfolds = maximum(folds)
+
+    # We shouldn't pass on nlambda and lambda_min_ratio if the user
+    # specified these, since that would make us throw errors, and this
+    # is entirely determined by the lambda values we will pass
+    filter!(kw) do akw
+        kwname = akw[1]
+        kwname != :nlambda && kwname != :lambda_min_ratio && kwname != :lambda
+    end
+
+    # Do model fits and compute loss for each
+    fits = (parallel ? pmap : map)(1:nfolds) do i
+        f = folds .== i
+        holdoutidx = find(f)
+        modelidx = find(!f)
+        g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                    weights=weights[modelidx], lambda=path.lambda, kw...)
+		#
+		risks = exp(predict(g, X) + repmat(offsets, 1, length(path.lambda)))
+        if grouped
+            plfull = coxDeviance(risks, y, weights)
+            plminusk = coxDeviance(risks[modelidx,:], y[modelidx,:], weights[modelidx])
+            plfull - plminusk
+        else
+            coxDeviance(risks[holdoutidx, :], y[holdoutidx, :], weights[holdoutidx])
+		end
+    end
+
+	fitloss = -hcat(fits...)::Matrix{Float64}
+	meanloss = mean(fitloss, 2)
+	stdloss = std(fitloss, 2)
+
+    GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
+end
