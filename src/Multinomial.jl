@@ -6,7 +6,7 @@ macro validate_and_init_multi()
         (size(constraints, 1) == 2 && size(constraints, 2) == size(X, 2)) ||
             error(Base.LinAlg.DimensionMismatch("contraints must be a 2 x n matrix"))
         0 <= lambda_min_ratio <= 1 || error("lambda_min_ratio must be in range [0.0, 1.0]")
-
+        #
         if !isempty(lambda)
             # user-specified lambda values
             nlambda == 100 || error("cannot specify both lambda and nlambda")
@@ -15,23 +15,23 @@ macro validate_and_init_multi()
             nlambda = length(lambda)
             lambda_min_ratio = 2.0
         end
-
-		alpha = float(alpha)
-		nobs = int32(size(X, 1))
-		nvars = int32(size(X, 2))
-		nresp = int32(size(y, 2))
-		dfmax = int32(dfmax)
-		pmax = int32(pmax)
-    	nlambda = int32(nlambda);
-		lambda_min_ratio = float(lambda_min_ratio)
-		lambda = convert(Vector{Float64}, lambda)
-		tol = float(tol)
-		standardize = int32(standardize)
-		intercept = int32(intercept)
-		maxit = int32(maxit)
-		null_dev = 0.0
-		jd = int32(0)
-
+        #
+        alpha = float(alpha)
+        nobs = int32(size(X, 1))
+        nvars = int32(size(X, 2))
+        nresp = int32(size(y, 2))
+        dfmax = int32(dfmax)
+        pmax = int32(pmax)
+        nlambda = int32(nlambda);
+        lambda_min_ratio = float(lambda_min_ratio)
+        lambda = convert(Vector{Float64}, lambda)
+        tol = float(tol)
+        standardize = int32(standardize)
+        intercept = int32(intercept)
+        maxit = int32(maxit)
+        null_dev = 0.0
+        jd = int32(0)
+        #
         lmu = Int32[0]
         a0 = zeros(Float64, nresp, nlambda)
         ca = zeros(Float64, pmax, nresp, nlambda)
@@ -70,38 +70,38 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              lambda_min_ratio::Real=(length(y) < size(X, 2) ? 1e-2 : 1e-4),
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000, grouped_multinomial = Bool::false,  
-			 algorithm::Symbol=:newtonraphson)
-	@validate_and_init_multi
-	kopt = grouped_multinomial? int32(2) : 
-		algorithm == :newtonraphson ? int32(0) :
-		algorithm == :modifiednewtonraphson ? int32(1) : 
-		algorithm == :nzsame ? int32(2) : 
-		error("unknown algorithm ")
-	# check offsets
+             algorithm::Symbol=:newtonraphson)
+    @validate_and_init_multi
+    kopt = grouped_multinomial? int32(2) : 
+        algorithm == :newtonraphson ? int32(0) :
+        algorithm == :modifiednewtonraphson ? int32(1) : 
+        algorithm == :nzsame ? int32(2) : 
+        error("unknown algorithm ")
+    # check offsets
     assert(size(y) == size(offsets))
-	y = y .* repmat(weights, 1, nresp)
-	# call lognet
-	ccall(
-		(:lognet_, libglmnet), Void, (
-			Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   ,
-			Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   ,
-			Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   , Ptr{Int32}   ,
-			Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Float64} ,
-			Ptr{Int32}     , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   ,
-			Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   ,
-			Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Float64} ,
-			Ptr{Int32}     , Ptr{Int32}
-			)              ,
-			&alpha         , &nobs             , &nvars       , &nresp       ,
-			X              , y                 , offsets      , &jd          ,
-			penalty_factor , constraints       , &dfmax       , &pmax        ,
-			&nlambda       , &lambda_min_ratio , lambda       , &tol         ,
-			&standardize   , &intercept        , &maxit       , &kopt        ,
-			lmu            , a0                , ca           , ia           ,
-			nin            , &null_dev         , fdev         , alm          ,
-			nlp            , jerr
-		)
-	@check_and_return_multi
+    y = y .* repmat(weights, 1, nresp)
+    # call lognet
+    ccall(
+        (:lognet_, libglmnet), Void, (
+            Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   ,
+            Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   ,
+            Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   , Ptr{Int32}   ,
+            Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Float64} ,
+            Ptr{Int32}     , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   ,
+            Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   ,
+            Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Float64} ,
+            Ptr{Int32}     , Ptr{Int32}
+            )              ,
+            &alpha         , &nobs             , &nvars       , &nresp       ,
+            X              , y                 , offsets      , &jd          ,
+            penalty_factor , constraints       , &dfmax       , &pmax        ,
+            &nlambda       , &lambda_min_ratio , lambda       , &tol         ,
+            &standardize   , &intercept        , &maxit       , &kopt        ,
+            lmu            , a0                , ca           , ia           ,
+            nin            , &null_dev         , fdev         , alm          ,
+            nlp            , jerr
+        )
+    @check_and_return_multi
 end
 
 glmnet(X::Matrix{Float64}, y::Matrix, family::Multinomial; kw...) =
