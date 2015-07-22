@@ -130,6 +130,15 @@ glmnet(X::Matrix{Float64}, y::Matrix, family::CoxPH; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 
 
+function glmnet(X::Matrix{Float64}, time::Vector{Float64}, 
+	status::Vector{Int}, family::CoxPH = CoxPH(); kw...)
+	#
+	assert(size(x, 1) == length(time) == length(status))
+	y = [time status]
+    glmnet!(copy(X), y, family; kw...)
+end
+
+
 
 predict(path::CoxNetPath, X::AbstractMatrix, args...) = X * path.betas
 
