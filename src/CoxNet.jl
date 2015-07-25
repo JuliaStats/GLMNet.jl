@@ -1,3 +1,5 @@
+export CoxNetPath
+
 immutable CoxPH <: ContinuousUnivariateDistribution
     theta::Float64 # risk
     CoxPH(theta::Real) = new(float64(theta))
@@ -16,7 +18,7 @@ immutable CoxNetPath
                                      # data for all lamda values
 end
 
-function coxDeviance(risk::Array, y::Matrix{Float64}, 
+function CoxDeviance(risk::Array, y::Matrix{Float64}, 
         weights::AbstractVector{Float64}=ones(size(y, 1))) 
     order = sortperm(y[:, 1])
     y = y[order,:]
@@ -53,7 +55,7 @@ function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
         model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
     validate_x_y_weights(X, y, weights)
     risk = exp(predict(path, X, model))
-    devs = coxDeviance(risk, y, weights)
+    devs = CoxDeviance(risk, y, weights)
     return -devs ./ sum(y[:, 2])
 end
 
@@ -61,8 +63,12 @@ loss(path::CoxNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatri
         weights::AbstractVector=ones(size(y, 1)), va...) = 
     loss(path, float64(X), float64(y), float64(weights), va...)
 
-
 modeltype(::CoxPH) = "Cox's Proportional Model"
+
+function show(io::IO, g::CoxNetPath)
+    println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
+    print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
+end
 
 
 macro check_and_return_cox()
@@ -185,11 +191,11 @@ function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
         #
         risks = exp(predict(g, X) + repmat(offsets, 1, length(path.lambda)))
         if grouped
-            plfull = coxDeviance(risks, y, weights)
-            plminusk = coxDeviance(risks[modelidx,:], y[modelidx,:], weights[modelidx])
+            plfull = CoxDeviance(risks, y, weights)
+            plminusk = CoxDeviance(risks[modelidx,:], y[modelidx,:], weights[modelidx])
             plfull - plminusk
         else
-            coxDeviance(risks[holdoutidx, :], y[holdoutidx, :], weights[holdoutidx])
+            CoxDeviance(risks[holdoutidx, :], y[holdoutidx, :], weights[holdoutidx])
         end
     end
 
