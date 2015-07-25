@@ -7,37 +7,43 @@
 
 ## Quick start
 
-To fit a basic model:
+To fit a basic regression model:
 
 ```julia
 julia> using GLMNet
+
+julia> srand(123)
 
 julia> y = [1:100]+randn(100)*10;
 
 julia> X = [1:100 (1:100)+randn(100)*5 (1:100)+randn(100)*10 (1:100)+randn(100)*20];
 
 julia> path = glmnet(X, y)
-Least Squares GLMNet Solution Path (55 solutions for 4 predictors in 163 passes):
-55x3 DataFrame:
-         df  pct_dev        λ
-[1,]      0      0.0  27.1988
-[2,]      1 0.154843  24.7825
-[3,]      1 0.283396  22.5809
-  :
-[53,]     2 0.911956 0.215546
-[54,]     2 0.911966 0.196397
-[55,]     2 0.911974  0.17895
+Least Squares GLMNet Solution Path (74 solutions for 4 predictors in 832 passes):
+74x3 DataFrame
+| Row | df | pct_dev  | λ         |
+|-----|----|----------|-----------|
+| 1   | 0  | 0.0      | 29.6202   |
+| 2   | 1  | 0.148535 | 26.9888   |
+| 3   | 1  | 0.271851 | 24.5912   |
+| 4   | 1  | 0.37423  | 22.4066   |
+⋮
+| 70  | 4  | 0.882033 | 0.0482735 |
+| 71  | 4  | 0.882046 | 0.043985  |
+| 72  | 4  | 0.882058 | 0.0400775 |
+| 73  | 4  | 0.882067 | 0.0365171 |
+| 74  | 4  | 0.882075 | 0.033273  |
 ```
 
 `path` represents the Lasso or ElasticNet fits for varying values of λ. The value of the intercept for each λ value are in `path.a0`. The coefficients for each fit are stored in compressed form in `path.betas`.
 
 ```julia
 julia> path.betas
-4x55 CompressedPredictorMatrix:
- 0.0  0.083706  0.159976  0.22947  …  0.929157    0.929315  
- 0.0  0.0       0.0       0.0         0.00655753  0.00700862
- 0.0  0.0       0.0       0.0         0.0         0.0       
- 0.0  0.0       0.0       0.0         0.0         0.0
+4x74 CompressedPredictorMatrix:
+ 0.0  0.091158  0.174218  0.249899  0.318857  0.381688  0.438938  0.491102  0.538632  …   0.902207   0.905364   0.908404   0.910988   0.913497   0.915593   0.917647
+ 0.0  0.0       0.0       0.0       0.0       0.0       0.0       0.0       0.0           0.129457   0.129059   0.128679   0.128359   0.128054   0.127805   0.127568
+ 0.0  0.0       0.0       0.0       0.0       0.0       0.0       0.0       0.0          -0.116622  -0.119305  -0.121874  -0.12408   -0.126211  -0.128015  -0.129776
+ 0.0  0.0       0.0       0.0       0.0       0.0       0.0       0.0       0.0           0.108096   0.108137   0.108159   0.108198   0.108217   0.108254   0.108272
 ```
 
 This CompressedPredictorMatrix can be indexed as any other AbstractMatrix, or converted to a Matrix using `convert(Matrix, path.betas)`.
@@ -46,8 +52,8 @@ To predict the output for each model along the path for a given set of predictor
 
 ```julia
 julia> predict(path, [22 22+randn()*5 22+randn()*10 22+randn()*20])
-1x55 Array{Float64,2}:
- 51.7098  49.3242  47.1505  45.1699  …  25.1036  25.0878  25.0736
+1x74 Array{Float64,2}:
+ 50.8669  48.2689  45.9017  43.7448  41.7795  39.9888  38.3572  36.8705  35.5159  …  21.9056  21.9115  21.9171  21.922  21.9266  21.9306  21.9344  21.9377  21.9407
 ```
 
 To find the best value of λ by cross-validation, use `glmnetcv`:
@@ -55,25 +61,78 @@ To find the best value of λ by cross-validation, use `glmnetcv`:
 ```julia
 julia> cv = glmnetcv(X, y)
 Least Squares GLMNet Cross Validation
-55 models for 4 predictors in 10 folds
-Best λ 0.343 (mean loss 76.946, std 12.546)
+74 models for 4 predictors in 10 folds
+Best λ 0.450 (mean loss 129.720, std 14.871)
 
 julia> indmin(cv.meanloss)
-48
+46
 
-julia> cv.path.betas[:, 48]
+julia> cv.path.betas[:, 46]
 4-element Array{Float64,1}:
- 0.926911  
- 0.00366805
- 0.0       
+ 0.781119
+ 0.128094
  0.0
+ 0.103008
+
+julia> coef(cv)
+4-element Array{Float64,1}:
+ 0.781119
+ 0.128094
+ 0.0
+ 0.103008
 ```
+
+Classification example:
+
+```julia
+julia> using RDatasets
+
+julia> iris = dataset("datasets", "iris");
+
+julia> X = convert(Matrix, iris[:, 1:4]);
+
+julia> y = convert(Vector, iris[:Species]);
+
+julia> iris_cv = glmnetcv(X, y)
+Multinomial GLMNet Cross Validation
+100 models for 4 predictors in 10 folds
+Best λ 0.000 (mean loss -13.129, std 8.670)
+
+julia> xpred = predict(iris_cv, X, outtype = :prob)
+150x3 Array{Float64,2}:
+ 0.33402      0.66598      8.18545e-9
+ 0.0547817    0.945218     4.31347e-7
+ 0.290808     0.709192     6.10286e-8
+ 0.116339     0.88366      1.07654e-6
+ 0.519054     0.480946     4.00958e-9
+ 0.170126     0.829874     1.84398e-7
+ 0.370725     0.629275     2.67971e-7
+ 0.197469     0.802531     5.72337e-8
+ 0.101571     0.898427     2.53714e-6
+ ⋮
+ 1.32985e-36  4.43691e-22  1.0
+ 9.81275e-35  2.55675e-21  1.0
+ 1.13035e-40  5.2086e-25   1.0
+ 5.76539e-41  1.45827e-25  1.0
+ 1.1244e-37   6.02061e-23  1.0
+ 3.63512e-35  5.8802e-21   1.0
+ 9.03786e-35  6.55048e-21  1.0
+ 8.19343e-37  3.76175e-23  1.0
+ 2.91289e-32  1.19357e-19  1.0
+```
+
 
 ## Fitting models
 
-`glmnet` has two required parameters: the m x n predictor matrix `X` and the dependent variable `y`. It additionally accepts an optional third argument, `family`, which can be used to specify a generalized linear model. Currently, only `Normal()` (least squares, default), `Binomial()` (logistic), and `Poisson()` are supported, although the glmnet Fortran code also implements a Cox model. For logistic models, `y` is a m x 2 matrix, where the first column is the count of negative responses for each row in `X` and the second column is the count of positive responses. For all other models, `y` is a vector.
+`glmnet` has two required parameters: the m x n predictor matrix `X` and the dependent variable `y`. It additionally accepts an optional third argument, `family`, which can be used to specify a generalized linear model. Currently, `Normal()` (least squares, default), `Binomial()` (logistic), `Poisson()` , `Multinomial()`, `CoxPH()` (Cox model) are supported. 
 
-`glmnet` also accepts many optional parameters, described below:
+- For linear and Poisson models, `y` is a numerical vector.
+- For logistic models, `y` is either a string vector or a m x 2 matrix, where the first column is the count of negative responses for each row in `X` and the second column is the count of positive responses. 
+- For multinomial model, `y` is etiher a string vector (with at least 3 unique values) or a m x k matrix, where k is number of unique values (classes).
+- For Cox model, `y` is a 2-column matrix, where the first column is survival time and second column is (right) censoring status. Indeed, For survival data, `glmnet` has has another method `glmnet(X, time, status)`.
+
+
+`glmnet` also accepts many optional keyword parameters, described below:
 
  - `weights`: A vector of weights for each sample of the same size as `y`.
  - `alpha`: The tradeoff between lasso and ridge regression. This defaults to `1.0`, which specifies a lasso model.
