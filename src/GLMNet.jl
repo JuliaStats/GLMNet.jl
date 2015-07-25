@@ -88,7 +88,7 @@ end
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repmat(path.a0[model].', sz, 1)
 function predict(path::GLMNetPath, X::AbstractMatrix,
-                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+                 model::Union(Int, AbstractVector{Int})=1:length(path.a0); outtype = :link)
     betas = path.betas
     ca = betas.ca
     ia = betas.ia
@@ -105,6 +105,11 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
         end
     end
 
+    if isa(path, GLMNetPath{Binomial}) && outtype != :link
+        y = 1. ./ (1. + exp(-y))
+    elseif is(path, GLMNetPath{Poisson}) && outtype != :link
+        y = exp(y)
+    end
     y
 end
 
