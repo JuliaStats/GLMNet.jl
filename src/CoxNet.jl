@@ -1,4 +1,4 @@
-export CoxNetPath
+export CoxPH, CoxNetPath
 
 immutable CoxPH <: ContinuousUnivariateDistribution
     theta::Float64 # risk
@@ -86,8 +86,8 @@ end
 
 
 function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPH;
-             offsets::Union(Vector{Float64}, Nothing)=nothing,
-             weights::Vector{Float64}=ones(length(y)),
+             offsets::Vector{Float64}=zeros(size(y,1)),
+             weights::Vector{Float64}=ones(size(y,1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
              constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
@@ -148,10 +148,10 @@ glmnet(X::Matrix{Float64}, y::Matrix, family::CoxPH; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 
 
-function glmnet(X::Matrix{Float64}, time::Vector{Float64}, 
-    status::Vector{Int}, family::CoxPH = CoxPH(); kw...)
+function glmnet(X::Matrix{Float64}, time::Vector,
+    status::Vector, family::CoxPH = CoxPH(); kw...)
     #
-    assert(size(x, 1) == length(time) == length(status))
+    assert(size(X, 1) == length(time) == length(status))
     y = [time status]
     glmnet!(copy(X), y, family; kw...)
 end
@@ -159,8 +159,8 @@ end
 
 function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
             family::CoxPH; weights::Vector{Float64}=ones(size(X,1)),
-            grouped = true,
-            nfolds::Int=min(10, div(size(y, 1), 3)),
+            offsets::Vector{Float64}=zeros(size(X,1)),
+            grouped = true, nfolds::Int=min(10, div(size(X, 1), 3)),
             folds::Vector{Int}=begin
                 n, r = divrem(size(y, 1), nfolds)
                 shuffle!([repmat(1:nfolds, n); 1:r])
@@ -186,8 +186,8 @@ function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
         f = folds .== i
         holdoutidx = find(f)
         modelidx = find(!f)
-        g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
-                    weights=weights[modelidx], lambda=path.lambda, kw...)
+        g = glmnet!(X[modelidx, :], y[modelidx, :], family; weights=weights[modelidx], 
+            offsets = offsets[modelidx], lambda=path.lambda, kw...)
         #
         risks = exp(predict(g, X) + repmat(offsets, 1, length(path.lambda)))
         if grouped
@@ -200,8 +200,15 @@ function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
     end
 
     fitloss = -hcat(fits...)::Matrix{Float64}
-    meanloss = mean(fitloss, 2)
-    stdloss = std(fitloss, 2)
+    meanloss = mean(fitloss, 2)[:,1]
+    stdloss = std(fitloss, 2)[:,1]
 
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
+end
+
+
+function glmnetcv(X::AbstractMatrix, time::Vector, status::Vector, family = CoxPH(); kw...)
+    assert(size(X, 1) == length(time) == length(status))
+    y = [time status]
+	glmnet(X, y, family = CoxPH(); kw...)
 end
