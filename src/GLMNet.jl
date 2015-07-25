@@ -381,7 +381,7 @@ function show(io::IO, cv::GLMNetCrossValidation)
 end
 
 function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
-                  family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
+                  family::Distribution=Normal(); weights::Vector{Float64}=ones(size(X,1)),
                   offsets::Union(AbstractVector, AbstractMatrix, Nothing)=nothing,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
