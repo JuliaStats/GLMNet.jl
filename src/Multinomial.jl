@@ -5,7 +5,6 @@ Multinomial() = Multinomial(1, 1.)
 immutable GLMNetPathMultinomial{F<:Distribution}
     family::F
     a0::Array{Float64}
-    #betas::Vector{CompressedPredictorMatrix}
     betas::Array{Float64}
     null_dev::Float64
     dev_ratio::Vector{Float64}
@@ -49,10 +48,11 @@ function loss(path::GLMNetPathMultinomial, X::AbstractMatrix{Float64},
 end
 
 
-loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
-     weights::AbstractVector=ones(size(y, 1)), va...) =
-  loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
-       convert(Vector{Float64}, weights), va...)
+loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix), 
+        weights::AbstractVector=ones(size(y, 1)), va...) =
+    loss(path, convert(Matrix{Float64}, X), 
+        convert(Array{Float64}, y),
+        convert(Vector{Float64}, weights), va...)
 
 
 macro validate_and_init_multi()
@@ -110,9 +110,6 @@ macro check_and_return_multi()
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
-#        xx = [CompressedPredictorMatrix(
-#            size(X, 2), reshape(ca[:, _, 1:lmu], (size(ca, 1), lmu)), ia, nin[1:lmu]
-#            ) for _ in 1:size(ca, 2)]
         GLMNetPathMultinomial(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
             null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
     end)
@@ -140,7 +137,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     # check offsets
     assert(size(y) == size(offsets))
     y = y .* repmat(weights, 1, size(y, 2))
-    # call lognet
+	#
     ccall(
         (:lognet_, libglmnet), Void, (
             Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   , # 1
