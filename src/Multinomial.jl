@@ -138,7 +138,7 @@ end
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Multinomial;
              offsets::Matrix{Float64}=y*0.,
-             weights::Vector{Float64}=ones(size(y, 1)),
+             weights::Vector{Float64}=ones(size(X, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
              constraints::Array{Float64, 2}=[_ for _ in (-Inf, Inf), y in 1:size(X, 2)],
@@ -191,13 +191,27 @@ typealias StringVector Union(Vector{String}, Vector{UTF8String}, Vector{UTF16Str
 function glmnet(X::Matrix{Float64}, y::StringVector; kw...)
     lev = sort(unique(y))
     if length(lev) >= 2
-        yy = convert(Matrix{Float64}, [i == j for i in y, j in lev])
+        y = convert(Matrix{Float64}, [i == j for i in y, j in lev])
         if length(lev) == 2
-            glmnet(X, yy, Binomial(); kw...)
+            glmnet(X, y, Binomial(); kw...)
         else 
-            glmnet(X, yy, Multinomial(); kw...)
+            glmnet(X, y, Multinomial(); kw...)
         end
     else 
+        error("y has only one level.")
+    end
+end
+
+function glmnetcv(X::Matrix{Float64}, y::StringVector; kw...)
+    lev = sort(unique(y))
+    if length(lev) >= 2
+        y = convert(Matrix{Float64}, [i == j for i in y, j in lev])
+        if length(lev) == 2
+            glmnetcv(X, y, Binomial(); kw...)
+        else
+            glmnetcv(X, y, Multinomial(); kw...)
+        end
+    else
         error("y has only one level.")
     end
 end
