@@ -377,6 +377,7 @@ end
 
 function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
                   family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
+                  offsets::Union(AbstractVector, AbstractMatrix)=y*0.,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
@@ -404,7 +405,8 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
         holdoutidx = find(f)
         modelidx = find(!f)
         g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
-                    weights=weights[modelidx], lambda=path.lambda, kw...)
+                    weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :], 
+                    lambda=path.lambda, kw...)
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
              weights[holdoutidx])
     end
