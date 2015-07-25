@@ -216,7 +216,7 @@ function glmnetcv(X::AbstractMatrix, time::Vector, status::Vector, family = CoxP
 end
 
 
-function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix, outtype = :link)
+function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix; outtype = :link)
     ind = indmin(pathcv.meanloss)
     predict(pathcv.path, X, ind; outtype = outtype)
 end
