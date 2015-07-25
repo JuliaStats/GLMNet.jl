@@ -190,7 +190,7 @@ function check_jerr(jerr, maxit)
     elseif jerr == 1000
         error("glmnet: all predictors are unpenalized")
     elseif -10001 < jerr < 0
-        warn("glment: convergence for $(-jerr)th lambda value not reached after $maxit iterations")
+        warn("glmnet: convergence for $(-jerr)th lambda value not reached after $maxit iterations")
     elseif jerr < -10000
         warn("glmnet: number of non-zero coefficients along path exceeds $nx at $(maxit+10000)th lambda value")
     end
@@ -377,7 +377,7 @@ end
 
 function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
                   family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
-                  offsets::Union(AbstractVector, AbstractMatrix)=y*0.,
+                  offsets::Union(AbstractVector, AbstractMatrix, Nothing)=nothing,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
@@ -386,7 +386,12 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
     # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
     y = convert(Array{Float64}, y)
-    path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
+    if isa(family, Normal)
+        path = glmnet(X, y, family; weights = weights, kw...)
+    else
+        offsets = (offsets == nothing)? y*0. : offsets
+        path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
+    end
 
     # In case user defined folds
     nfolds = maximum(folds)
@@ -404,9 +409,14 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
         f = folds .== i
         holdoutidx = find(f)
         modelidx = find(!f)
-        g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
-                    weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :], 
-                    lambda=path.lambda, kw...)
+        if isa(family, Normal)
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                        weights=weights[modelidx], lambda=path.lambda, kw...)
+        else
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                        weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :],
+                        lambda=path.lambda, kw...)
+        end
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
              weights[holdoutidx])
     end
@@ -442,7 +452,7 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
 end
 
-	include("Multinomial.jl")
-	include("CoxNet.jl")
+include("Multinomial.jl")
+include("CoxNet.jl")
 
 end # module
