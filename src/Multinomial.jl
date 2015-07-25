@@ -4,15 +4,56 @@ Multinomial() = Multinomial(1, 1.)
 
 immutable GLMNetPathMultinomial{F<:Distribution}
     family::F
-    a0::Array{Float64}              # intercept values for each solution
+    a0::Array{Float64}
     #betas::Vector{CompressedPredictorMatrix}
     betas::Array{Float64}
-    null_dev::Float64                # Null deviance of the model
-    dev_ratio::Vector{Float64}       # R^2 values for each solution
-    lambda::Vector{Float64}          # lamda values corresponding to each solution
-    npasses::Int                     # actual number of passes over the
-                                     # data for all lamda values
+    null_dev::Float64
+    dev_ratio::Vector{Float64}
+    lambda::Vector{Float64}
+    npasses::Int
 end
+
+
+function predict(path::GLMNetPathMultinomial, X::AbstractMatrix,
+         model::Union(Int, AbstractVector{Int})=1:length(path.lambda); outtype = :link)
+    nresp = size(path.betas, 2);
+    out = Array{Float64, size(x, 1), nresp, length(model)};
+    for i = 1:length(model)
+        out[:, :, i] = X * path.betas[:, :, model[i]]
+    end
+    if outtype != :link
+        out = exp(out)
+        for i = 1:length(model)
+            out[:, :, i] = out[:, :, i] ./ repmat(sum(out[:, :, i], 2), 1, nresp)
+        end
+    end
+    return out
+end
+
+
+function MultinomialDeviance(p::Matrix{Float64}, y::Matrix{Float64}, 
+    weights::AbstractVector{Float64}=ones(size(y, 1)))
+    sum([y[i, j] == 0.0 ? 0.0 : w[i] * log(y[i, j]) 
+        for i in 1:size(y, 1),  j in 1:size(y, 2)]
+        ) / sum(weights)
+end
+
+
+function loss(path::GLMNetPathMultinomial, X::AbstractMatrix{Float64},
+              y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
+              weights::AbstractVector{Float64}=ones(size(y, 1)),
+              model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
+    validate_x_y_weights(X, y, weights)
+    prob = predict(path, X, model, outtype = :link)
+    convert(Vector{Float64}, [MultinomialDeviance(prob[i], y, weights) for i in 1:length(model)])
+end
+
+
+loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
+     weights::AbstractVector=ones(size(y, 1)), va...) =
+  loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
+       convert(Vector{Float64}, weights), va...)
+
 
 macro validate_and_init_multi()
     esc(quote
@@ -90,7 +131,6 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000, grouped_multinomial::Bool=false,  
              algorithm::Symbol=:newtonraphson)
-    println("1")
     @validate_and_init_multi
     kopt = grouped_multinomial? int32(2) : 
         algorithm == :newtonraphson ? int32(0) :
@@ -98,13 +138,11 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
         algorithm == :nzsame ? int32(2) : 
         error("unknown algorithm ")
     # check offsets
-    println("2")
     assert(size(y) == size(offsets))
     y = y .* repmat(weights, 1, size(y, 2))
     # call lognet
-    println("3")
     ccall(
-        (:lognet_, "glmnet.so"), Void, (
+        (:lognet_, libglmnet), Void, (
             Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   , # 1
             Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   , # 2
             Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   , Ptr{Int32}   , # 3
@@ -128,3 +166,18 @@ end
 
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Multinomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
+
+
+function glmnet(X::Matrix{Float64}, y::Vector{AbstractString}; kw...)
+    lev = sort(unique(y))
+    if length(lev) >= 2
+        yy = convert(Matrix{Float64}, [i == j for i in y, j in ylev])
+        if length(lev) == 2
+            glmnet(X, yy, Binomial(); kw...)
+        else 
+            glmnet(X, yy, Multinomial(); kw...)
+        end
+    else 
+        error("y has only one level.")
+    end
+end
