@@ -1,7 +1,7 @@
 import Distributions.Multinomial
 export LogNetPath
 
-Multinomial() = Multinomial(1, 1.)
+Multinomial() = Multinomial(1, 1)
 
 immutable LogNetPath{F<:Distribution}
     family::F
@@ -17,7 +17,7 @@ end
 function predict(path::LogNetPath, X::AbstractMatrix,
          model::Union(Int, AbstractVector{Int})=1:length(path.lambda); outtype = :link)
     nresp = size(path.betas, 2);
-    out = Array{Float64, size(x, 1), nresp, length(model)};
+    out = zeros(Float64, size(X, 1), nresp, length(model));
     for i = 1:length(model)
         out[:, :, i] = X * path.betas[:, :, model[i]]
     end
@@ -33,9 +33,9 @@ end
 
 function MultinomialDeviance(p::Matrix{Float64}, y::Matrix{Float64}, 
     weights::AbstractVector{Float64}=ones(size(y, 1)))
-    sum([y[i, j] == 0.0 ? 0.0 : w[i] * log(y[i, j]) 
-        for i in 1:size(y, 1),  j in 1:size(y, 2)]
-        ) / sum(weights)
+	assert(size(p) == size(y))
+	assert(size(p,1) == length(weights))
+	sum(y .* log(p) .* repmat(weights, 1, size(y, 2))) / sum(weights)
 end
 
 
@@ -43,9 +43,9 @@ function loss(path::LogNetPath, X::AbstractMatrix{Float64},
               y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
-    validate_x_y_weights(X, y, weights)
-    prob = predict(path, X, model, outtype = :link)
-    convert(Vector{Float64}, [MultinomialDeviance(prob[i], y, weights) for i in 1:length(model)])
+	validate_x_y_weights(X, y, weights)
+    prob = predict(path, X, model, outtype = :prob)
+    convert(Vector{Float64}, [MultinomialDeviance(prob[:,:, i], y, weights) for i in 1:length(model)])
 end
 
 
@@ -54,6 +54,14 @@ loss(path::LogNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatri
     loss(path, convert(Matrix{Float64}, X), 
         convert(Array{Float64}, y),
         convert(Vector{Float64}, weights), va...)
+
+
+# Get number of active predictors for a model in X
+# nin can be > non-zero predictors under some circumstances...
+nactive(X::Array{Float64, 3}, b::Int) = sum(sum(X[:,:,b] .!= 0., 1) .> 0)
+
+nactive(X::Array{Float64, 3}, b::AbstractVector{Int}=1:size(X, 3)) =
+    [nactive(X, j) for j in b]
 
 
 function show(io::IO, g::LogNetPath)
@@ -171,11 +179,12 @@ end
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Multinomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 
+typealias StringVector Union(Vector{String}, Vector{UTF8String}, Vector{UTF16String}, Vector{ASCIIString})
 
-function glmnet(X::Matrix{Float64}, y::Vector{AbstractString}; kw...)
+function glmnet(X::Matrix{Float64}, y::StringVector; kw...)
     lev = sort(unique(y))
     if length(lev) >= 2
-        yy = convert(Matrix{Float64}, [i == j for i in y, j in ylev])
+        yy = convert(Matrix{Float64}, [i == j for i in y, j in lev])
         if length(lev) == 2
             glmnet(X, yy, Binomial(); kw...)
         else 
