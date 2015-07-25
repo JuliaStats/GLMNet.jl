@@ -359,7 +359,7 @@ glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
 immutable GLMNetCrossValidation
-    path::GLMNetPath
+    path::Any
     nfolds::Int
     lambda::Vector{Float64}
     meanloss::Vector{Float64}
@@ -439,4 +439,8 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
 
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
 end
+
+	include("Multinomial.jl")
+	include("CoxNet.jl")
+
 end # module
