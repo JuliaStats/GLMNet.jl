@@ -1,8 +1,9 @@
 import Distributions.Multinomial
+export LogNetPath
 
 Multinomial() = Multinomial(1, 1.)
 
-immutable GLMNetPathMultinomial{F<:Distribution}
+immutable LogNetPath{F<:Distribution}
     family::F
     a0::Array{Float64}
     betas::Array{Float64}
@@ -13,7 +14,7 @@ immutable GLMNetPathMultinomial{F<:Distribution}
 end
 
 
-function predict(path::GLMNetPathMultinomial, X::AbstractMatrix,
+function predict(path::LogNetPath, X::AbstractMatrix,
          model::Union(Int, AbstractVector{Int})=1:length(path.lambda); outtype = :link)
     nresp = size(path.betas, 2);
     out = Array{Float64, size(x, 1), nresp, length(model)};
@@ -38,7 +39,7 @@ function MultinomialDeviance(p::Matrix{Float64}, y::Matrix{Float64},
 end
 
 
-function loss(path::GLMNetPathMultinomial, X::AbstractMatrix{Float64},
+function loss(path::LogNetPath, X::AbstractMatrix{Float64},
               y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
@@ -48,11 +49,17 @@ function loss(path::GLMNetPathMultinomial, X::AbstractMatrix{Float64},
 end
 
 
-loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix), 
+loss(path::LogNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix), 
         weights::AbstractVector=ones(size(y, 1)), va...) =
     loss(path, convert(Matrix{Float64}, X), 
         convert(Array{Float64}, y),
         convert(Vector{Float64}, weights), va...)
+
+
+function show(io::IO, g::LogNetPath)
+    println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
+    print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
+end
 
 
 macro validate_and_init_multi()
@@ -110,7 +117,7 @@ macro check_and_return_multi()
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
-        GLMNetPathMultinomial(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
+        LogNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
             null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
     end)
 end
@@ -137,7 +144,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     # check offsets
     assert(size(y) == size(offsets))
     y = y .* repmat(weights, 1, size(y, 2))
-	#
+
     ccall(
         (:lognet_, libglmnet), Void, (
             Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   , # 1
