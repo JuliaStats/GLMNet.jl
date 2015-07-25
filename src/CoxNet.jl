@@ -16,7 +16,8 @@ immutable CoxNetPath
                                      # data for all lamda values
 end
 
-function coxDeviance(risk::Array, y::Matrix{Float64}, weights::AbstractVector{Float64}=ones(size(y, 1))) 
+function coxDeviance(risk::Array, y::Matrix{Float64}, 
+        weights::AbstractVector{Float64}=ones(size(y, 1))) 
     order = sortperm(y[:, 1])
     y = y[order,:]
     risk = risk[order, :]
@@ -33,21 +34,32 @@ function coxDeviance(risk::Array, y::Matrix{Float64}, weights::AbstractVector{Fl
     end
     return devs
 end
-    
+
+
+function predict(path::CoxNetPath, X::AbstractMatrix, 
+        model::Union(Int, AbstractVector{Int})=1:length(path.lambda); outtype = :link)
+    link = X * path.betas[:, model]
+    if outtype == :link
+        return link
+    else
+        return exp(link)
+    end
+end
+
 
 function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
         y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
         weights::AbstractVector{Float64}=ones(size(y, 1)),
-        model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+        model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
     validate_x_y_weights(X, y, weights)
     risk = exp(predict(path, X, model))
     devs = coxDeviance(risk, y, weights)
-    return -devs/sum(y[:, 2])
+    return -devs ./ sum(y[:, 2])
 end
 
 loss(path::CoxNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
         weights::AbstractVector=ones(size(y, 1)), va...) = 
-	loss(path, float64(X), float64(y), float64(weights), va...)
+    loss(path, float64(X), float64(y), float64(weights), va...)
 
 
 modeltype(::CoxPH) = "Cox's Proportional Model"
@@ -131,16 +143,12 @@ glmnet(X::Matrix{Float64}, y::Matrix, family::CoxPH; kw...) =
 
 
 function glmnet(X::Matrix{Float64}, time::Vector{Float64}, 
-	status::Vector{Int}, family::CoxPH = CoxPH(); kw...)
-	#
-	assert(size(x, 1) == length(time) == length(status))
-	y = [time status]
+    status::Vector{Int}, family::CoxPH = CoxPH(); kw...)
+    #
+    assert(size(x, 1) == length(time) == length(status))
+    y = [time status]
     glmnet!(copy(X), y, family; kw...)
 end
-
-
-
-predict(path::CoxNetPath, X::AbstractMatrix, args...) = X * path.betas
 
 
 function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
