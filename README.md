@@ -128,8 +128,8 @@ julia> xpred = predict(iris_cv, X, outtype = :prob)
 
 - For linear and Poisson models, `y` is a numerical vector.
 - For logistic models, `y` is either a string vector or a m x 2 matrix, where the first column is the count of negative responses for each row in `X` and the second column is the count of positive responses. 
-- For multinomial model, `y` is etiher a string vector (with at least 3 unique values) or a m x k matrix, where k is number of unique values (classes).
-- For Cox model, `y` is a 2-column matrix, where the first column is survival time and second column is (right) censoring status. Indeed, For survival data, `glmnet` has has another method `glmnet(X, time, status)`.
+- For multinomial models, `y` is etiher a string vector (with at least 3 unique values) or a m x k matrix, where k is number of unique values (classes).
+- For Cox models, `y` is a 2-column matrix, where the first column is survival time and second column is (right) censoring status. Indeed, For survival data, `glmnet` has another method `glmnet(X::Matrix, time::Vector, status::Vector)`. Same for `glmnetcv`.
 
 
 `glmnet` also accepts many optional keyword parameters, described below:
