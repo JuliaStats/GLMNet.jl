@@ -27,7 +27,11 @@ function predict(path::LogNetPath, X::AbstractMatrix,
             out[:, :, i] = out[:, :, i] ./ repmat(sum(out[:, :, i], 2), 1, nresp)
         end
     end
-    return out
+    if length(model) == 1
+        return out[:, :, 1]
+    else
+        return out
+    end
 end
 
 
@@ -178,6 +182,9 @@ end
 
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Multinomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
+
+glmnet(X::AbstractMatrix, y::AbstractMatrix, family::Multinomial; kw...) =
+    glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
 typealias StringVector Union(Vector{String}, Vector{UTF8String}, Vector{UTF16String}, Vector{ASCIIString})
 
