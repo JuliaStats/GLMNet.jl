@@ -1,4 +1,5 @@
-export CoxPH, CoxNetPath
+import DataFrames.coef
+export CoxPH, CoxNetPath, coef, lambdamin
 
 immutable CoxPH <: ContinuousUnivariateDistribution
     theta::Float64 # risk
@@ -9,13 +10,12 @@ end
 
 immutable CoxNetPath
     family::CoxPH
-    a0::Vector{Float64}              # intercept values for each solution
-    betas::CompressedPredictorMatrix # coefficient values for each solution
-    null_dev::Float64                # Null deviance of the model
-    dev_ratio::Vector{Float64}       # R^2 values for each solution
-    lambda::Vector{Float64}          # lamda values corresponding to each solution
-    npasses::Int                     # actual number of passes over the
-                                     # data for all lamda values
+    a0::Vector{Float64}
+    betas::CompressedPredictorMatrix
+    null_dev::Float64
+    dev_ratio::Vector{Float64}
+    lambda::Vector{Float64}
+    npasses::Int
 end
 
 function CoxDeviance(risk::Array, y::Matrix{Float64}, 
@@ -220,3 +220,10 @@ function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix, outtype = :li
     ind = indmin(pathcv.meanloss)
     predict(pathcv.path, X, ind; outtype = outtype)
 end
+
+function coef(pathcv::GLMNetCrossValidation)
+	ind = indmin(pathcv.meanloss)
+	pathcv.path.betas[:, ind]
+end
+
+lambdamin(pathcv::GLMNetCrossValidation) = pathcv.lambda[indmin(pathcv.meanloss)]
