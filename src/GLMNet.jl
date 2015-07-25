@@ -386,7 +386,7 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
     # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
     y = convert(Array{Float64}, y)
-    path = glmnet(X, y, family; kw...)
+    path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
 
     # In case user defined folds
     nfolds = maximum(folds)
