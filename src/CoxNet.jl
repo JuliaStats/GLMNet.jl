@@ -85,7 +85,7 @@ macro check_and_return_cox()
 end
 
 
-function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPH;
+function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
              offsets::Vector{Float64}=zeros(size(y,1)),
              weights::Vector{Float64}=ones(size(y,1)),
              alpha::Real=1.0,
@@ -98,8 +98,8 @@ function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPH;
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
     assert(size(y) == tuple(size(y, 1), 2))
-    times  = convert(Vector{Float64}, y[:, 1])
-    status = convert(Vector{Float64}, y[:, 2])
+    times  = y[:, 1]
+    status = y[:, 2]
     nobs = int32(size(X, 1))
     nvars = int32(size(X, 2))
     dfmax = int32(dfmax);
@@ -144,16 +144,18 @@ function glmnet!(X::Matrix{Float64}, y::Matrix, family::CoxPH;
 end
 
 
-glmnet(X::Matrix{Float64}, y::Matrix, family::CoxPH; kw...) =
+glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 
+glmnet(X::AbstractMatrix, y::AbstractMatrix, family::CoxPH; kw...) =
+    glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
-function glmnet(X::Matrix{Float64}, time::Vector,
-    status::Vector, family::CoxPH = CoxPH(); kw...)
+function glmnet(X::AbstractMatrix, time::AbstractVector,
+    status::AbstractVector, family::CoxPH = CoxPH(); kw...)
     #
     assert(size(X, 1) == length(time) == length(status))
     y = [time status]
-    glmnet!(copy(X), y, family; kw...)
+    glmnet(X, y, family; kw...)
 end
 
 
@@ -211,4 +213,10 @@ function glmnetcv(X::AbstractMatrix, time::Vector, status::Vector, family = CoxP
     assert(size(X, 1) == length(time) == length(status))
     y = [time status]
 	glmnet(X, y, family = CoxPH(); kw...)
+end
+
+
+function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix, outtype = :link)
+    ind = indmin(pathcv.meanloss)
+    predict(pathcv.path, X, ind; outtype = outtype)
 end
