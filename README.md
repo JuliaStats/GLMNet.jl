@@ -93,32 +93,42 @@ julia> X = convert(Matrix, iris[:, 1:4]);
 
 julia> y = convert(Vector, iris[:Species]);
 
-julia> iris_cv = glmnetcv(X, y)
+julia> iTrain = sample(1:size(X,1), 100, replace = false);
+
+julia> iTest = setdiff(1:size(X,1), iTrain);
+
+julia> iris_cv = glmnetcv(X[iTrain, :], y[iTrain])
 Multinomial GLMNet Cross Validation
 100 models for 4 predictors in 10 folds
-Best λ 0.000 (mean loss -13.129, std 8.670)
+Best λ 0.000 (mean loss -2.195, std 0.384)
 
-julia> xpred = predict(iris_cv, X, outtype = :prob)
-150x3 Array{Float64,2}:
- 0.33402      0.66598      8.18545e-9
- 0.0547817    0.945218     4.31347e-7
- 0.290808     0.709192     6.10286e-8
- 0.116339     0.88366      1.07654e-6
- 0.519054     0.480946     4.00958e-9
- 0.170126     0.829874     1.84398e-7
- 0.370725     0.629275     2.67971e-7
- 0.197469     0.802531     5.72337e-8
- 0.101571     0.898427     2.53714e-6
- ⋮
- 1.32985e-36  4.43691e-22  1.0
- 9.81275e-35  2.55675e-21  1.0
- 1.13035e-40  5.2086e-25   1.0
- 5.76539e-41  1.45827e-25  1.0
- 1.1244e-37   6.02061e-23  1.0
- 3.63512e-35  5.8802e-21   1.0
- 9.03786e-35  6.55048e-21  1.0
- 8.19343e-37  3.76175e-23  1.0
- 2.91289e-32  1.19357e-19  1.0
+julia> xpred = predict(iris_cv, X[iTest, :], outtype = :prob);
+julia> convert(DataFrame, [y[iTest] round(xpred, 3)])
+50x4 DataFrame
+| Row | x1          | x2    | x3    | x4  |
+|-----|-------------|-------|-------|-----|
+| 1   | "setosa"    | 0.275 | 0.725 | 0.0 |
+| 2   | "setosa"    | 0.763 | 0.237 | 0.0 |
+| 3   | "setosa"    | 0.414 | 0.586 | 0.0 |
+| 4   | "setosa"    | 0.146 | 0.854 | 0.0 |
+| 5   | "setosa"    | 0.568 | 0.432 | 0.0 |
+| 6   | "setosa"    | 0.76  | 0.24  | 0.0 |
+| 7   | "setosa"    | 0.864 | 0.136 | 0.0 |
+| 8   | "setosa"    | 0.831 | 0.169 | 0.0 |
+| 9   | "setosa"    | 0.663 | 0.337 | 0.0 |
+| 10  | "setosa"    | 0.035 | 0.965 | 0.0 |
+⋮
+| 40  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 41  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 42  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 43  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 44  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 45  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 46  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 47  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 48  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 49  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 50  | "virginica" | 0.0   | 0.0   | 1.0 |
 ```
 
 
