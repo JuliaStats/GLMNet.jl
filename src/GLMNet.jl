@@ -394,7 +394,8 @@ function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
     if isa(family, Normal)
         path = glmnet(X, y, family; weights = weights, kw...)
     else
-        offsets = (offsets == nothing)? zeros(size(X, 1)) : offsets
+        offsets = (offsets != nothing)? offsets:
+            isa(family, Binomial)? zeros(size(X, 1)) : y*0.0
         path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
     end
 
