@@ -181,7 +181,7 @@ plot(cox)
 plot(cox, Scale.x_log10, Scale.y_log10, y = :absCoefficients, Guide.xlabel("λ"))
 
 
-cox_foldid = rep([1:3], 5);
+cox_foldid = repmat([1:3], 5);
 coxcv = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda, folds = cox_foldid)
 
 @test_approx_eq_eps coxcv.meanloss [10.75651, 10.81102, 10.79783, 11.78060, 14.97191, 19.59119, 24.63270, 34.80017, 43.99917, 51.85903] 2e-5
