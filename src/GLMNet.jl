@@ -3,7 +3,7 @@ using DataFrames, Distributions, Compat
 
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
-import Base.getindex, Base.convert, Base.size, Base.show
+import Base.getindex, Base.convert, Base.size, Base.show, DataFrames.predict
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
