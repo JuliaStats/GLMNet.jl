@@ -15,16 +15,16 @@ end
 
 
 function predict(path::LogNetPath, X::AbstractMatrix,
-         model::Union(Int, AbstractVector{Int})=1:length(path.lambda); outtype = :link)
+         model::Union(Int, AbstractVector{Int})=1:length(path.lambda); 
+		 outtype = :link, offsets = zeros(size(X, 1), size(path.betas, 2)))
     nresp = size(path.betas, 2);
     out = zeros(Float64, size(X, 1), nresp, length(model));
     for i = 1:length(model)
-        out[:, :, i] = X * path.betas[:, :, model[i]]
+        out[:, :, i] = repmat(path.a0[:,model[i]].', size(X, 1)) + X * path.betas[:, :, model[i]] + offsets
     end
     if outtype != :link
-        out = exp(out)
-        for i = 1:length(model)
-            out[:, :, i] = out[:, :, i] ./ repmat(sum(out[:, :, i], 2), 1, nresp)
+        for i = 1:size(X, 1), j = 1:length(model)
+            out[i, :, j] = softmax(out[i, :, j])
         end
     end
     if length(model) == 1
@@ -35,29 +35,31 @@ function predict(path::LogNetPath, X::AbstractMatrix,
 end
 
 
-function MultinomialDeviance(p::Matrix{Float64}, y::Matrix{Float64}, 
+function MultinomialDeviance(y::Matrix{Float64}, p::Matrix{Float64}, 
     weights::AbstractVector{Float64}=ones(size(y, 1)))
 	assert(size(p) == size(y))
 	assert(size(p,1) == length(weights))
-	sum(y .* log(p) .* repmat(weights, 1, size(y, 2))) / sum(weights)
+	p = ifelse(p .< PMIN, PMIN, ifelse(p .> PMAX, PMAX, p))
+	-2*sum(y .* log(p) .* repmat(weights, 1, size(y, 2))) / sum(weights)
 end
 
 
 function loss(path::LogNetPath, X::AbstractMatrix{Float64},
               y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
               weights::AbstractVector{Float64}=ones(size(y, 1)),
-              model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
+              model::Union(Int, AbstractVector{Int})=1:length(path.lambda);
+			  offsets = zeros(size(X,1), size(path.betas, 2)))
 	validate_x_y_weights(X, y, weights)
-    prob = predict(path, X, model, outtype = :prob)
-    convert(Vector{Float64}, [MultinomialDeviance(prob[:,:, i], y, weights) for i in 1:length(model)])
+    prob = predict(path, X, model; outtype = :prob, offsets = offsets)
+    convert(Vector{Float64}, [MultinomialDeviance(y, prob[:,:, i], weights) for i in 1:length(model)])
 end
 
 
 loss(path::LogNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix), 
-        weights::AbstractVector=ones(size(y, 1)), va...) =
+        weights::AbstractVector=ones(size(y, 1)), va...; kw...) =
     loss(path, convert(Matrix{Float64}, X), 
         convert(Array{Float64}, y),
-        convert(Vector{Float64}, weights), va...)
+        convert(Vector{Float64}, weights), va...; kw...)
 
 
 # Get number of active predictors for a model in X
@@ -105,7 +107,7 @@ macro validate_and_init_multi()
         standardize = int32(standardize)
         intercept = int32(intercept)
         maxit = int32(maxit)
-        null_dev = 0.0
+        null_dev = [0.0]
         jd = int32(0)
         #
         lmu = Int32[0]
@@ -129,8 +131,9 @@ macro check_and_return_multi()
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
+		a0 = a0 - repmat(mean(a0, 1), size(a0, 1))
         LogNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
-            null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
+            null_dev[1], fdev[1:lmu], alm[1:lmu], int(nlp[1]))
     end)
 end
 
@@ -155,6 +158,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
         error("unknown algorithm ")
     # check offsets
     assert(size(y) == size(offsets))
+	offsets = copy(offsets)
     y = y .* repmat(weights, 1, size(y, 2))
 
     ccall(
@@ -174,7 +178,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
             &nlambda       , &lambda_min_ratio , lambda       , &tol         , # 4
             &standardize   , &intercept        , &maxit       , &kopt        , # 5
             lmu            , a0                , ca           , ia           , # 6
-            nin            , &null_dev         , fdev         , alm          , # 7
+            nin            , null_dev          , fdev         , alm          , # 7
             nlp            , jerr                                              # 8
         )
     @check_and_return_multi
