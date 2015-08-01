@@ -112,11 +112,11 @@ julia> iTest = setdiff(1:size(X,1), iTrain);
 julia> iris_cv = glmnetcv(X[iTrain, :], y[iTrain])
 Multinomial GLMNet Cross Validation
 100 models for 4 predictors in 10 folds
-Best λ 0.000 (mean loss -2.195, std 0.384)
+Best λ 0.001 (mean loss 0.124, std 0.046)
 
-julia> yhat = round(predict(iris_cv, X[iTest, :], outtype = :prob), 3);
+julia> yht = round(predict(iris_cv, X[iTest, :], outtype = :prob), 3);
 
-julia> DataFrame(target=y[iTest], set=yhat[:,1], ver=yhat[:,2], vir=yhat[:,3])[5:5:50,:]
+julia> DataFrame(target=y[iTest], set=yht[:,1], ver=yht[:,2], vir=yht[:,3])[5:5:50,:]
 10x4 DataFrame
 | Row | target       | set   | ver   | vir   |
 |-----|--------------|-------|-------|-------|
