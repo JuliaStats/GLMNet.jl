@@ -226,9 +226,13 @@ function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix; outtype = :li
     predict(pathcv.path, X, ind; outtype = outtype, kw...)
 end
 
+lambdamin(pathcv::GLMNetCrossValidation) = pathcv.lambda[indmin(pathcv.meanloss)]
+
 function coef(pathcv::GLMNetCrossValidation)
     ind = indmin(pathcv.meanloss)
-    pathcv.path.betas[:, ind]
+    if isa(pathcv.path.family, Multinomial)
+        pathcv.path.betas[:,:,ind]
+    else
+        pathcv.path.betas[:, ind]
+    end
 end
-
-lambdamin(pathcv::GLMNetCrossValidation) = pathcv.lambda[indmin(pathcv.meanloss)]
