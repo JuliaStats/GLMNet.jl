@@ -48,6 +48,15 @@ julia> path.betas
 
 This CompressedPredictorMatrix can be indexed as any other AbstractMatrix, or converted to a Matrix using `convert(Matrix, path.betas)`.
 
+One can visualize the path by
+
+```julia
+julia> using Gadfly
+
+julia> plot(path, Scale.x_log10, Guide.xlabel("λ"))
+```
+![regression-lasso-path](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/regression_lasso_path.png)
+
 To predict the output for each model along the path for a given set of predictors, use `predict`:
 
 ```julia
@@ -80,7 +89,10 @@ julia> coef(cv)
  0.128094
  0.0
  0.103008
+
+julia> plot(cv)
 ```
+![regression-cv](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/regression_cv.png)
 
 Classification example:
 
@@ -129,7 +141,10 @@ julia> convert(DataFrame, [y[iTest] round(xpred, 3)])
 | 48  | "virginica" | 0.0   | 0.0   | 1.0 |
 | 49  | "virginica" | 0.0   | 0.0   | 1.0 |
 | 50  | "virginica" | 0.0   | 0.0   | 1.0 |
+
+julia> plot(iris_cv.path)
 ```
+![iris-lasso-path](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/iris_lasso_path.png) 
 
 
 ## Fitting models
