@@ -114,22 +114,22 @@ Multinomial GLMNet Cross Validation
 100 models for 4 predictors in 10 folds
 Best λ 0.000 (mean loss -2.195, std 0.384)
 
-julia> xpred = predict(iris_cv, X[iTest, :], outtype = :prob);
+julia> yhat = round(predict(iris_cv, X[iTest, :], outtype = :prob), 3);
 
-julia> convert(DataFrame, [y[iTest] round(xpred, 3)])
-50x4 DataFrame
-| Row | x1          | x2    | x3    | x4    |
-|-----|-------------|-------|-------|-------|
-| 1   | "setosa"    | 0.999 | 0.001 | 0.0   |
-| 2   | "setosa"    | 0.999 | 0.001 | 0.0   |
-| 3   | "setosa"    | 1.0   | 0.0   | 0.0   |
-| 4   | "setosa"    | 1.0   | 0.0   | 0.0   |
-⋮
-| 46  | "virginica" | 0.0   | 0.0   | 1.0   |
-| 47  | "virginica" | 0.0   | 0.004 | 0.996 |
-| 48  | "virginica" | 0.0   | 0.005 | 0.995 |
-| 49  | "virginica" | 0.0   | 0.0   | 1.0   |
-| 50  | "virginica" | 0.0   | 0.025 | 0.975 |
+julia> DataFrame(target=y[iTest], set=yhat[:,1], ver=yhat[:,2], vir=yhat[:,3])[5:5:50,:]
+10x4 DataFrame
+| Row | target       | set   | ver   | vir   |
+|-----|--------------|-------|-------|-------|
+| 1   | "setosa"     | 0.999 | 0.001 | 0.0   |
+| 2   | "setosa"     | 1.0   | 0.0   | 0.0   |
+| 3   | "setosa"     | 1.0   | 0.0   | 0.0   |
+| 4   | "versicolor" | 0.0   | 0.983 | 0.017 |
+| 5   | "versicolor" | 0.002 | 0.961 | 0.037 |
+| 6   | "versicolor" | 0.0   | 0.067 | 0.933 |
+| 7   | "versicolor" | 0.0   | 0.993 | 0.007 |
+| 8   | "virginica"  | 0.0   | 0.0   | 1.0   |
+| 9   | "virginica"  | 0.0   | 0.397 | 0.603 |
+| 10  | "virginica"  | 0.0   | 0.025 | 0.975 |
 
 julia> plot(iris_cv.path)
 ```
