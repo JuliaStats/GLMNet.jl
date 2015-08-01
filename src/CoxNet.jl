@@ -4,7 +4,7 @@ export CoxPH, CoxNetPath, coef, lambdamin
 immutable CoxPH <: ContinuousUnivariateDistribution
     theta::Float64 # risk
     CoxPH(theta::Real) = new(float64(theta))
-    CoxPH() = new(float64(0))
+    CoxPH() = CoxPH(0)
 end
 
 
@@ -18,7 +18,7 @@ immutable CoxNetPath
     npasses::Int
 end
 
-function CoxDeviance(risk::Array, y::Matrix{Float64}, 
+function CoxDeviance(risk::Array, y::Matrix,
         weights::AbstractVector{Float64}=ones(size(y, 1))) 
     order = sortperm(y[:, 1])
     y = y[order,:]
@@ -34,7 +34,7 @@ function CoxDeviance(risk::Array, y::Matrix{Float64},
             end
         end
     end
-    return devs
+    return -devs
 end
 
 
@@ -43,7 +43,11 @@ function predict(path::CoxNetPath, X::AbstractMatrix,
         outtype = :link, offsets = zeros(size(X, 1)))
     link = X * path.betas[:, model]
     if any(offsets .!= 0)
-        link += repmat(offsets, 1, length(model))[:, model]
+        if isa(model, Vector)
+            link += repmat(offsets, 1, length(model))
+        else
+            link += offsets
+        end
     end
     if outtype == :link
         return link
@@ -61,7 +65,7 @@ function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
     validate_x_y_weights(X, y, weights)
     risk = exp(predict(path, X, model; offsets = offsets))
     devs = CoxDeviance(risk, y, weights)
-    return -devs ./ sum(y[:, 2])
+    return devs ./ sum(y[:, 2])
 end
 
 loss(path::CoxNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
@@ -206,7 +210,7 @@ function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
         end
     end
 
-    fitloss = -hcat(fits...)::Matrix{Float64}
+    fitloss = hcat(fits...)::Matrix{Float64}
     meanloss = mean(fitloss, 2)[:,1]
     stdloss = std(fitloss, 2)[:,1]
 

@@ -69,7 +69,7 @@ end
 
 function show(io::IO, X::CompressedPredictorMatrix)
     println(io, "$(size(X, 1))x$(size(X, 2)) CompressedPredictorMatrix:")
-    Base.showarray(io, convert(Matrix, X); header=false)
+    Base.showarray(io, convert(Matrix{Float64}, X); header=false)
 end
 
 immutable GLMNetPath{F<:Distribution}
@@ -185,7 +185,6 @@ loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatri
 
 modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
-modeltype(::Multinomial) = "Multinomial"
 modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)

@@ -2,6 +2,7 @@ import Distributions.Multinomial
 export LogNetPath
 
 Multinomial() = Multinomial(1, 1)
+modeltype(::Multinomial) = "Multinomial"
 
 immutable LogNetPath{F<:Distribution}
     family::F

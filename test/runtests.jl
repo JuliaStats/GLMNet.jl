@@ -40,6 +40,9 @@ path = glmnet(X, y)
 plot(path, Scale.x_log10)
 plot(path, x = :deviance)
 plot(path, x = :norm1, y = :absCoefficients)
+plot(path, x = :norm2)
+@test_throws ErrorException plot(path, x = :Coeff)
+@test_throws ErrorException plot(path, y = :Coeff)
 
 # Cross-validation
 cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
@@ -49,12 +52,16 @@ cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
 @test_approx_eq lambdamin(cv) 4.110862702400506
 @test_approx_eq coef(cv) [0.0, 0.0, 0.0, 0.0, 0.0, 0.8204019515486727]
 
+# Test nfolds
+glmnetcv(X, y, nfolds = 3)
+
 # Test plot on cv
 plot(cv, Guide.xlabel("λ"))
 
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
+show(IOBuffer(), cv.path.betas)
 
 ## LOGISTIC
 yl = [(y .< 50) (y .>= 50)]
@@ -76,6 +83,7 @@ path = glmnet(X, convert(Matrix{Float64}, yl), Binomial())
 @test_approx_eq path.betas[:, models] betas
 @test_approx_eq predict(path, X, 16) [-1.315519391606169,1.722425698139390,3.007710159185589,2.306645907705844,-1.782895559259332,1.430315593356164,1.897691761009327,-1.315519391606169,2.949288138228943,-2.250271726912495]
 @test_approx_eq predict(path, X, 62) [-5.328152634222764,5.936301834664929,10.640103977849353,8.017225144937120,-6.891307125813680,5.068602350662909,6.514278565882654,-5.352339338181535,10.448596815251006,-8.571939893775767]
+@test_approx_eq predict(path, X, 60, outtype = :prob, offsets = ones(size(X, 1))) 1.0 ./ (1.0 + exp(-predict(path, X, 60) - 1))
 
 # Cross-validation
 cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
@@ -153,6 +161,7 @@ end
 
 
 ## Cox model
+
 dat = [ 31  1  82  0  0  100   90   413   27
        201  1  73  1  2   70   60  1225  -16
        243  0  63  1  1   80   90   825    0
@@ -180,9 +189,13 @@ cox = glmnet(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda)
 @test nactive(cox.betas) == [1, 2, 3, 3, 5, 6, 7, 7, 7, 7]
 @test cox.npasses == 391
 @test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], [3, 7]) cox_pred 1e-5
+@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], 3, outtype = :risk, offsets = ones(size(dat, 1)))  exp(cox_pred[:, 1]+1.0) 1e-3
+@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], [3, 7], offsets = [1:size(dat, 1)])  cox_pred+repmat(1:size(cox_pred,1), 1, 2) 1e-5
 
 plot(cox)
 plot(cox, Scale.x_log10, Scale.y_log10, y = :absCoefficients, Guide.xlabel("λ"))
+@test_throws ErrorException plot(cox, y = :deviance)
+@test_throws ErrorException plot(cox, x = :coef)
 
 cox_foldid = repmat([1:3], 5);
 coxcv = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda, folds = cox_foldid)
@@ -241,6 +254,17 @@ iris_cv2 = glmnetcv(iris_x, iris_yy, Multinomial(), folds = multi_folds)
 @test_approx_eq_eps  predict(iris_mod1, iris_x, 50, outtype = :prob)[1:5:30, :] multi_pred 1e-6
 @test_approx_eq lambdamin(iris_cv) 0.006607988468679545
 @test_approx_eq_eps coef(iris_cv) [0.0 0.509063 0.0; 1.51684 0.0 0.0; -1.41089 0.0 3.51886; -2.84823 0.0 1.79608] 1e-5
+@test nactive(iris_mod1.betas, 8) == 2
+@test nactive(iris_mod1.betas, [7, 92, 100]) == [2, 3, 3]
 
-plot(iris_mod1, x = :norm2)
+plot(iris_mod1)
+plot(iris_mod1, x = :dev)
+plot(iris_mod1, x = :norm1, y = :absCoefficients)
+plot(iris_mod2, x = :norm2)
 plot(iris_cv)
+@test_throws ErrorException plot(iris_mod1, y = :deviance)
+@test_throws ErrorException plot(iris_mod2, x = :coef)
+
+# Make sure show works
+show(IOBuffer(), iris_cv)
+show(IOBuffer(), iris_cv.path)
