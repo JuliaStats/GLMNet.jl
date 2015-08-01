@@ -16,7 +16,7 @@ end
 
 function predict(path::LogNetPath, X::AbstractMatrix,
          model::Union(Int, AbstractVector{Int})=1:length(path.lambda); 
-		 outtype = :link, offsets = zeros(size(X, 1), size(path.betas, 2)))
+         outtype = :link, offsets = zeros(size(X, 1), size(path.betas, 2)))
     nresp = size(path.betas, 2);
     out = zeros(Float64, size(X, 1), nresp, length(model));
     for i = 1:length(model)
@@ -37,10 +37,10 @@ end
 
 function MultinomialDeviance(y::Matrix{Float64}, p::Matrix{Float64}, 
     weights::AbstractVector{Float64}=ones(size(y, 1)))
-	assert(size(p) == size(y))
-	assert(size(p,1) == length(weights))
-	p = ifelse(p .< PMIN, PMIN, ifelse(p .> PMAX, PMAX, p))
-	-2*sum(y .* log(p) .* repmat(weights, 1, size(y, 2))) / sum(weights)
+    assert(size(p) == size(y))
+    assert(size(p,1) == length(weights))
+    p = ifelse(p .< PMIN, PMIN, ifelse(p .> PMAX, PMAX, p))
+    -2*sum(y .* log(p) .* repmat(weights, 1, size(y, 2))) / sum(weights)
 end
 
 
@@ -48,8 +48,8 @@ function loss(path::LogNetPath, X::AbstractMatrix{Float64},
               y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               model::Union(Int, AbstractVector{Int})=1:length(path.lambda);
-			  offsets = zeros(size(X,1), size(path.betas, 2)))
-	validate_x_y_weights(X, y, weights)
+              offsets = zeros(size(X,1), size(path.betas, 2)))
+    validate_x_y_weights(X, y, weights)
     prob = predict(path, X, model; outtype = :prob, offsets = offsets)
     convert(Vector{Float64}, [MultinomialDeviance(y, prob[:,:, i], weights) for i in 1:length(model)])
 end
@@ -131,7 +131,7 @@ macro check_and_return_multi()
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
-		a0 = a0 - repmat(mean(a0, 1), size(a0, 1))
+        a0 = a0 - repmat(mean(a0, 1), size(a0, 1))
         LogNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
             null_dev[1], fdev[1:lmu], alm[1:lmu], int(nlp[1]))
     end)
@@ -158,7 +158,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
         error("unknown algorithm ")
     # check offsets
     assert(size(y) == size(offsets))
-	offsets = copy(offsets)
+    offsets = copy(offsets)
     y = y .* repmat(weights, 1, size(y, 2))
 
     ccall(
