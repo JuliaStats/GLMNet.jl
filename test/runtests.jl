@@ -1,4 +1,4 @@
-using GLMNet, Distributions, Base.Test, Gadfly
+using GLMNet, Distributions, Base.Test, DataFrames, Gadfly
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
