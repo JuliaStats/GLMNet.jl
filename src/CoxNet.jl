@@ -39,8 +39,12 @@ end
 
 
 function predict(path::CoxNetPath, X::AbstractMatrix, 
-        model::Union(Int, AbstractVector{Int})=1:length(path.lambda); outtype = :link)
+        model::Union(Int, AbstractVector{Int})=1:length(path.lambda); 
+        outtype = :link, offsets = zeros(size(X, 1)))
     link = X * path.betas[:, model]
+    if any(offsets .!= 0)
+        link += repmat(offsets, 1, length(model))[:, model]
+    end
     if outtype == :link
         return link
     else
@@ -52,16 +56,17 @@ end
 function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
         y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
         weights::AbstractVector{Float64}=ones(size(y, 1)),
-        model::Union(Int, AbstractVector{Int})=1:length(path.lambda))
+        model::Union(Int, AbstractVector{Int})=1:length(path.lambda);
+        offsets = zeros(size(X, 1)))
     validate_x_y_weights(X, y, weights)
-    risk = exp(predict(path, X, model))
+    risk = exp(predict(path, X, model; offsets = offsets))
     devs = CoxDeviance(risk, y, weights)
     return -devs ./ sum(y[:, 2])
 end
 
 loss(path::CoxNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
-        weights::AbstractVector=ones(size(y, 1)), va...) = 
-    loss(path, float64(X), float64(y), float64(weights), va...)
+        weights::AbstractVector=ones(size(y, 1)), va...; kw...) = 
+    loss(path, float64(X), float64(y), float64(weights), va...; kw...)
 
 modeltype(::CoxPH) = "Cox's Proportional Model"
 
@@ -80,7 +85,7 @@ macro check_and_return_cox()
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        CoxNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], int(nlp[1]))
+        CoxNetPath(family, a0[1:lmu], X, null_dev[1], fdev[1:lmu], alm[1:lmu], int(nlp[1]))
     end)
 end
 
@@ -111,7 +116,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
     standardize = int32(standardize);
     intercept = int32(intercept);
     maxit = int32(maxit);
-    null_dev = 0.0;
+    null_dev = [0.0];
     jd = int32(0);
     #
     ca = zeros(Float64, pmax, nlambda) # fitted coef/param
@@ -120,8 +125,8 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
     fdev = zeros(Float64, nlambda)
     alm = zeros(Float64, nlambda)
     #
-    offsets = isa(offsets, Nothing) ? zeros(length(times)) : copy(offsets)
     length(offsets) == length(times) || error("length of offsets must match length of y")
+    offsets = copy(offsets)
     #
     ccall((:coxnet_, libglmnet), Void, (
         Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} , # 1
@@ -137,7 +142,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
         &jd          , penalty_factor , constraints       , &dfmax       , # 3
         &pmax        , &nlambda       , &lambda_min_ratio , lambda       , # 4
         &tol         , &maxit         , &standardize      , lmu          , # 5
-        ca           , ia             , nin               , &null_dev    , # 6
+        ca           , ia             , nin               , null_dev     , # 6
         fdev         , alm            , nlp               , jerr           # 7
         )
     @check_and_return_cox
@@ -191,7 +196,7 @@ function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
         g = glmnet!(X[modelidx, :], y[modelidx, :], family; weights=weights[modelidx], 
             offsets = offsets[modelidx], lambda=path.lambda, kw...)
         #
-        risks = exp(predict(g, X) + repmat(offsets, 1, length(path.lambda)))
+        risks = exp(predict(g, X; offsets = offsets))
         if grouped
             plfull = CoxDeviance(risks, y, weights)
             plminusk = CoxDeviance(risks[modelidx,:], y[modelidx,:], weights[modelidx])
@@ -212,18 +217,18 @@ end
 function glmnetcv(X::AbstractMatrix, time::Vector, status::Vector, family = CoxPH(); kw...)
     assert(size(X, 1) == length(time) == length(status))
     y = [time status]
-	glmnet(X, y, family = CoxPH(); kw...)
+    glmnetcv(X, y, CoxPH(); kw...)
 end
 
 
-function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix; outtype = :link)
+function predict(pathcv::GLMNetCrossValidation, X::AbstractMatrix; outtype = :link, kw...)
     ind = indmin(pathcv.meanloss)
-    predict(pathcv.path, X, ind; outtype = outtype)
+    predict(pathcv.path, X, ind; outtype = outtype, kw...)
 end
 
 function coef(pathcv::GLMNetCrossValidation)
-	ind = indmin(pathcv.meanloss)
-	pathcv.path.betas[:, ind]
+    ind = indmin(pathcv.meanloss)
+    pathcv.path.betas[:, ind]
 end
 
 lambdamin(pathcv::GLMNetCrossValidation) = pathcv.lambda[indmin(pathcv.meanloss)]
