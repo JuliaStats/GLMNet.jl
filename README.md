@@ -40,10 +40,10 @@ Least Squares GLMNet Solution Path (74 solutions for 4 predictors in 832 passes)
 ```julia
 julia> path.betas
 4x74 CompressedPredictorMatrix:
- 0.0  0.091158  0.174218  0.249899  0.318857  0.381688  0.438938  0.491102  0.538632  …   0.902207   0.905364   0.908404   0.910988   0.913497   0.915593   0.917647
- 0.0  0.0       0.0       0.0       0.0       0.0       0.0       0.0       0.0           0.129457   0.129059   0.128679   0.128359   0.128054   0.127805   0.127568
- 0.0  0.0       0.0       0.0       0.0       0.0       0.0       0.0       0.0          -0.116622  -0.119305  -0.121874  -0.12408   -0.126211  -0.128015  -0.129776
- 0.0  0.0       0.0       0.0       0.0       0.0       0.0       0.0       0.0           0.108096   0.108137   0.108159   0.108198   0.108217   0.108254   0.108272
+ 0.0  0.091158  0.174218  …   0.913497   0.915593   0.917647
+ 0.0  0.0       0.0           0.128054   0.127805   0.127568
+ 0.0  0.0       0.0          -0.126211  -0.128015  -0.129776
+ 0.0  0.0       0.0           0.108217   0.108254   0.108272
 ```
 
 This CompressedPredictorMatrix can be indexed as any other AbstractMatrix, or converted to a Matrix using `convert(Matrix, path.betas)`.
@@ -62,7 +62,7 @@ To predict the output for each model along the path for a given set of predictor
 ```julia
 julia> predict(path, [22 22+randn()*5 22+randn()*10 22+randn()*20])
 1x74 Array{Float64,2}:
- 50.8669  48.2689  45.9017  43.7448  41.7795  39.9888  38.3572  36.8705  35.5159  …  21.9056  21.9115  21.9171  21.922  21.9266  21.9306  21.9344  21.9377  21.9407
+ 50.8669  48.2689  45.9017  …  21.9344  21.9377  21.9407
 ```
 
 To find the best value of λ by cross-validation, use `glmnetcv`:
@@ -94,7 +94,7 @@ julia> plot(cv)
 ```
 ![regression-cv](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/regression_cv.png)
 
-Classification example:
+### A classification Example
 
 ```julia
 julia> using RDatasets
@@ -115,32 +115,21 @@ Multinomial GLMNet Cross Validation
 Best λ 0.000 (mean loss -2.195, std 0.384)
 
 julia> xpred = predict(iris_cv, X[iTest, :], outtype = :prob);
+
 julia> convert(DataFrame, [y[iTest] round(xpred, 3)])
 50x4 DataFrame
-| Row | x1          | x2    | x3    | x4  |
-|-----|-------------|-------|-------|-----|
-| 1   | "setosa"    | 0.275 | 0.725 | 0.0 |
-| 2   | "setosa"    | 0.763 | 0.237 | 0.0 |
-| 3   | "setosa"    | 0.414 | 0.586 | 0.0 |
-| 4   | "setosa"    | 0.146 | 0.854 | 0.0 |
-| 5   | "setosa"    | 0.568 | 0.432 | 0.0 |
-| 6   | "setosa"    | 0.76  | 0.24  | 0.0 |
-| 7   | "setosa"    | 0.864 | 0.136 | 0.0 |
-| 8   | "setosa"    | 0.831 | 0.169 | 0.0 |
-| 9   | "setosa"    | 0.663 | 0.337 | 0.0 |
-| 10  | "setosa"    | 0.035 | 0.965 | 0.0 |
+| Row | x1          | x2    | x3    | x4    |
+|-----|-------------|-------|-------|-------|
+| 1   | "setosa"    | 0.999 | 0.001 | 0.0   |
+| 2   | "setosa"    | 0.999 | 0.001 | 0.0   |
+| 3   | "setosa"    | 1.0   | 0.0   | 0.0   |
+| 4   | "setosa"    | 1.0   | 0.0   | 0.0   |
 ⋮
-| 40  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 41  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 42  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 43  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 44  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 45  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 46  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 47  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 48  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 49  | "virginica" | 0.0   | 0.0   | 1.0 |
-| 50  | "virginica" | 0.0   | 0.0   | 1.0 |
+| 46  | "virginica" | 0.0   | 0.0   | 1.0   |
+| 47  | "virginica" | 0.0   | 0.004 | 0.996 |
+| 48  | "virginica" | 0.0   | 0.005 | 0.995 |
+| 49  | "virginica" | 0.0   | 0.0   | 1.0   |
+| 50  | "virginica" | 0.0   | 0.025 | 0.975 |
 
 julia> plot(iris_cv.path)
 ```
