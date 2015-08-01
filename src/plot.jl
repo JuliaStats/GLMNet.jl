@@ -1,4 +1,5 @@
-import Gadfly.plot
+import Gadfly.plot, Gadfly.Geom, Gadfly.Scale, Gadfly.Guide, Gadfly.mm
+export plot
 
 function plot(path::Union(GLMNetPath, CoxNetPath), args...; x = :lambda, y = :coefficients, color = :variable, xgroup = :response, kw...)
     betas = convert(Array, path.betas)
