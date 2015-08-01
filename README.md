@@ -53,9 +53,11 @@ One can visualize the path by
 ```julia
 julia> using Gadfly
 
-julia> plot(path, Scale.x_log10, Guide.xlabel("λ"))
+julia> plot(path, Guide.xlabel("||β||₁"), Guide.ylabel("βᵢ"), x=:norm1)
 ```
-![regression-lasso-path](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/regression_lasso_path.png)
+![regression-lasso-path](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/regression_lasso_path.svg)
+
+One can see that the LASSO path is piecewise linear.
 
 To predict the output for each model along the path for a given set of predictors, use `predict`:
 
@@ -89,10 +91,7 @@ julia> coef(cv)
  0.128094
  0.0
  0.103008
-
-julia> plot(cv)
 ```
-![regression-cv](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/regression_cv.png)
 
 ### A classification Example
 
@@ -131,10 +130,14 @@ julia> DataFrame(target=y[iTest], set=yht[:,1], ver=yht[:,2], vir=yht[:,3])[5:5:
 | 9   | "virginica"  | 0.0   | 0.397 | 0.603 |
 | 10  | "virginica"  | 0.0   | 0.025 | 0.975 |
 
-julia> plot(iris_cv.path)
+julia> plot(iris_cv.path, Scale.x_log10, Guide.xlabel("λ"), Guide.ylabel("βᵢ"))
 ```
-![iris-lasso-path](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/iris_lasso_path.png) 
+![iris-lasso-path](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/iris_lasso_path.svg) 
 
+```julia
+julia> plot(iris_cv)
+```
+![iris-cv](https://raw.githubusercontent.com/linxihui/Misc/master/Images/GLMNet.jl/iris_cv.svg)
 
 ## Fitting models
 
