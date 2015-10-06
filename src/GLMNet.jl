@@ -36,7 +36,7 @@ function getindex(X::CompressedPredictorMatrix, a::AbstractVector{Int}, b::Int)
     out
 end
 
-function getindex(X::CompressedPredictorMatrix, a::Union(Int, AbstractVector{Int}), b::AbstractVector{Int})
+function getindex(X::CompressedPredictorMatrix, a::@compat(Union{Int,AbstractVector{Int}}), b::AbstractVector{Int})
     checkbounds(X, a, b)
     out = zeros(length(a), length(b))
     for j = 1:length(b), i = 1:X.nin[b[j]]
@@ -88,7 +88,7 @@ end
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repmat(path.a0[model].', sz, 1)
 function predict(path::GLMNetPath, X::AbstractMatrix,
-                 model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+                 model::@compat(Union{Int,AbstractVector{Int}})=1:length(path.a0))
     betas = path.betas
     ca = betas.ca
     ia = betas.ia
@@ -155,10 +155,10 @@ end
 # Compute deviance for given model(s) with the predictors in X versus known
 # responses in y with the given weight
 function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
-              y::Union(AbstractVector{Float64}, AbstractMatrix{Float64}),
+              y::@compat(Union{AbstractVector{Float64}, AbstractMatrix{Float64}}),
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               lossfun::Loss=devloss(path.family, y),
-              model::Union(Int, AbstractVector{Int})=1:length(path.a0))
+              model::@compat(Union{Int, AbstractVector{Int}})=1:length(path.a0))
     validate_x_y_weights(X, y, weights)
     mu = predict(path, X, model)
     devs = zeros(size(mu, 2))
@@ -167,7 +167,7 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
     end
     devs/sum(weights)
 end
-loss(path::GLMNetPath, X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
+loss(path::GLMNetPath, X::AbstractMatrix, y::@compat(Union{AbstractVector, AbstractMatrix}),
      weights::AbstractVector=ones(size(y, 1)), va...) =
   loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
        convert(Vector{Float64}, weights), va...)
@@ -273,7 +273,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
-             offsets::Union(Vector{Float64}, Nothing)=nothing,
+             offsets::@compat(Union{Vector{Float64},Void})=nothing,
              weights::Vector{Float64}=ones(size(y, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -289,7 +289,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
-    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(size(y, 1)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
     null_dev = Array(Float64, 1)
@@ -320,7 +320,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Poisson;
-             offsets::Union(Vector{Float64}, Nothing)=nothing,
+             offsets::@compat(Union{Vector{Float64},Void})=nothing,
              weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -332,7 +332,7 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
     @validate_and_init
     null_dev = Array(Float64, 1)
 
-    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(length(y)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
     ccall((:fishnet_, libglmnet), Void,
@@ -375,7 +375,7 @@ function show(io::IO, cv::GLMNetCrossValidation)
     print(io, )
 end
 
-function glmnetcv(X::AbstractMatrix, y::Union(AbstractVector, AbstractMatrix),
+function glmnetcv(X::AbstractMatrix, y::@compat(Union{AbstractVector,AbstractMatrix}),
                   family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
