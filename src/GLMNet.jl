@@ -282,7 +282,7 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
 
-    ccall((:elnet_, libglmnet), Void,
+    ccall((:spelnet_, libglmnet), Void,
           (Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},
            Ptr{Float64}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
@@ -380,7 +380,7 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
         y[i, 2] = a*weights[i]
     end
 
-    ccall((:lognet_, libglmnet), Void,
+    ccall((:splognet_, libglmnet), Void,
           (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},
            Ptr{Float64},  Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
@@ -441,7 +441,7 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
     offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
-    ccall((:fishnet_, libglmnet), Void,
+    ccall((:spfishnet_, libglmnet), Void,
           (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},
            Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},

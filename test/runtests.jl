@@ -38,6 +38,13 @@ path = glmnet(X, y)
 
 # sparse
 path = glmnet(sparse(X), y)
+@test nactive(path.betas) == df_true
+@test_approx_eq path.dev_ratio dev_ratio
+@test_approx_eq path.lambda lambda
+@test_approx_eq path.a0 a0
+@test_approx_eq path.betas[:, models] betas
+@test_approx_eq predict(path, X, 16) [25.67451533276341,62.52776614976348,78.11952611080198,69.61492976841734,20.00478443784032,58.98418434043655,64.65391523535965,25.67451533276341,77.41080974893660,14.33505354291723]
+@test_approx_eq predict(path, X, 62) [9.688463955335449,65.513664866328625,89.537586892649699,84.299096349896985,5.711287928399321,61.686267113123805,69.396354069847447,12.253877034216755,81.104769545494065,17.808632244707766]
 
 # Cross-validation
 cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
@@ -71,7 +78,14 @@ path = glmnet(X, convert(Matrix{Float64}, yl), Binomial())
 @test_approx_eq predict(path, X, 62) [-5.328152634222764,5.936301834664929,10.640103977849353,8.017225144937120,-6.891307125813680,5.068602350662909,6.514278565882654,-5.352339338181535,10.448596815251006,-8.571939893775767]
 
 # sparse
-glmnet(sparse(X), yl, Binomial())
+path = glmnet(sparse(X), yl, Binomial())
+@test nactive(path.betas) == df_true
+@test_approx_eq path.dev_ratio dev_ratio
+@test_approx_eq path.lambda lambda
+@test_approx_eq path.a0 a0
+@test_approx_eq path.betas[:, models] betas
+@test_approx_eq predict(path, X, 16) [-1.315519391606169,1.722425698139390,3.007710159185589,2.306645907705844,-1.782895559259332,1.430315593356164,1.897691761009327,-1.315519391606169,2.949288138228943,-2.250271726912495]
+@test_approx_eq predict(path, X, 62) [-5.328152634222764,5.936301834664929,10.640103977849353,8.017225144937120,-6.891307125813680,5.068602350662909,6.514278565882654,-5.352339338181535,10.448596815251006,-8.571939893775767]
 
 # Cross-validation
 cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
@@ -113,7 +127,14 @@ path = glmnet([1 1; 2 2; 3 4], [0, 0, 1], Poisson())
 @test !any(isnan(GLMNet.loss(path, [1 1; 2 2; 4 4], [0, 0, 1])))
 
 # sparse
-glmnet(sparse(X), y, Poisson())
+path = glmnet(sparse(X), y, Poisson())
+@test nactive(path.betas) == df_true
+@test_approx_eq path.dev_ratio dev_ratio
+@test_approx_eq path.lambda lambda
+@test_approx_eq path.a0 a0
+@test_approx_eq path.betas[:, models] betas
+@test_approx_eq predict(path, X, 16) [3.195043339285695,4.063275663211828,4.430604723334422,4.230243417813007,3.061469135604752,3.979791785911238,4.113365989592181,3.195043339285695,4.413907947874304,2.927894931923808]
+@test_approx_eq predict(path, X, 62) [2.108607974403907,4.125962319203899,4.481867295351227,4.492300995443095,2.410180465556811,4.082152789977005,4.183424906852268,2.381251991983247,4.446875861428943,2.829218161240957]
 
 # Cross-validation
 cv = glmnetcv(X, y, Poisson(); folds=[1,1,1,1,2,2,2,3,3,3])
