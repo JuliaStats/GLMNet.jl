@@ -1,7 +1,7 @@
 module GLMNet
 using DataFrames, Distributions, Compat
 
-const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
+const libglmnet = joinpath(dirname(@__FILE__), "..", "deps", "libglmnet")
 
 import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
