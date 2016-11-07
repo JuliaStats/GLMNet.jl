@@ -120,11 +120,11 @@ show(IOBuffer(), cv.path)
 betas = path.betas
 cbetas = convert(Matrix{Float64}, path.betas)
 for j = 1:size(betas, 2), i = 1:size(betas, 1)
-    @assert betas[i, j] == cbetas[i, j]
-    @assert betas[1:i, j] == cbetas[1:i, j]
-    @assert betas[i:end, j] == cbetas[i:end, j]
-    @assert betas[i, 1:j] == cbetas[i, 1:j]
-    @assert betas[i, j:end] == cbetas[i, j:end]
-    @assert betas[1:i, 1:j] == cbetas[1:i, 1:j]
-    @assert betas[i:end, j:end] == cbetas[i:end, j:end]
+    @test betas[i, j] == cbetas[i, j]
+    @test betas[1:i, j] == cbetas[1:i, j]
+    @test betas[i:end, j] == cbetas[i:end, j]
+    @test betas[i, 1:j] == cbetas[i, 1:j]
+    @test betas[i, j:end] == cbetas[i, j:end]
+    @test betas[1:i, 1:j] == cbetas[1:i, 1:j]
+    @test betas[i:end, j:end] == cbetas[i:end, j:end]
 end
