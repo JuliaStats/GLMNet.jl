@@ -35,8 +35,7 @@ function getindex(X::CompressedPredictorMatrix, a::AbstractVector{Int}, b::Int)
     end
     out
 end
-
-function getindex(X::CompressedPredictorMatrix, a::@compat(Union{Int,AbstractVector{Int}}), b::AbstractVector{Int})
+function getindex(X::CompressedPredictorMatrix, a::AbstractVector{Int}, b::AbstractVector{Int})
     checkbounds(X, a, b)
     out = zeros(length(a), length(b))
     for j = 1:length(b), i = 1:X.nin[b[j]]
@@ -45,6 +44,24 @@ function getindex(X::CompressedPredictorMatrix, a::@compat(Union{Int,AbstractVec
         end
     end
     out
+end
+
+
+if VERSION < v"0.5.0"
+    # use old slicing behaviour
+    getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int}) = getindex(X,[a],b)
+else
+    # use new slicing behaviour
+    function getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int})
+        checkbounds(X, a, b)
+        out = zeros(length(b))
+        for j = 1:length(b), i = 1:X.nin[b[j]]
+            if a == X.ia[i]
+                out[j] = X.ca[i, b[j]]
+            end
+        end
+        out
+    end
 end
 
 # Get number of active predictors for a model in X
