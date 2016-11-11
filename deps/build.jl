@@ -1,3 +1,8 @@
 using Compat
-pic = @static is_windows() ? "" : "-fPIC"
-run(`gfortran -m$(Sys.WORD_SIZE) -fdefault-real-8 -ffixed-form $pic -shared -O3 glmnet5.f90 -o libglmnet.$(Libdl.dlext)`)
+@static if is_windows()
+    flags = ["-m$(Sys.WORD_SIZE)","-fdefault-real-8","-ffixed-form","-shared","-O3"]
+else
+    flags = ["-m$(Sys.WORD_SIZE)","-fdefault-real-8","-ffixed-form","-shared","-O3","-fPIC"]
+end
+
+run(`gfortran $flags glmnet5.f90 -o libglmnet.$(Libdl.dlext)`)
