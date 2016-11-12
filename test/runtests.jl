@@ -298,6 +298,7 @@ cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
                     0.00757252943821209,0.00727455485747877,0.00698779845948223]
 @test cv.lambda[argmin(cv.meanloss)] ≈ 0.0004835015175294886
 
+
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
@@ -305,6 +306,9 @@ show(IOBuffer(), cv.path)
 # Make sure passing nlambda to glmnetcv works
 cv = glmnetcv(X, y, Poisson(); nlambda=2, lambda_min_ratio=0.01)
 @test length(cv.lambda) == 2
+
+# Cross-validation with fewer than the total possible number of lambdas converging; doesn't test if the values are correct
+cvShort = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3],maxit=100)
 
 ## POISSON
 df_true = [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,4,4,4,4,5,5,
