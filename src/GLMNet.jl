@@ -110,7 +110,7 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
     ca = betas.ca
     ia = betas.ia
     nin = betas.nin
-    
+
     y = makepredictmat(path, size(X, 1), model)
     for b = 1:length(model)
         m = model[b]
@@ -425,8 +425,8 @@ function glmnetcv(X::AbstractMatrix, y::@compat(Union{AbstractVector,AbstractMat
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
              weights[holdoutidx])
     end
-
-    fitloss = hcat(fits...)::Matrix{Float64}
+    minLength = minabs([size(x)[1] for x in fits])
+    fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64} # This is throwing an error in relation to 382
 
     ninfold = zeros(Int, nfolds)
     for f in folds
