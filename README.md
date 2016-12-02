@@ -12,7 +12,7 @@ To fit a basic model:
 ```julia
 julia> using GLMNet
 
-julia> y = [1:100]+randn(100)*10;
+julia> y = collect(1:100) + randn(100)*10;
 
 julia> X = [1:100 (1:100)+randn(100)*5 (1:100)+randn(100)*10 (1:100)+randn(100)*20];
 
