@@ -4,7 +4,7 @@ using DataFrames, Distributions, Compat
 const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
 
 import Base.getindex, Base.convert, Base.size, Base.show
-export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
+export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix, lambdabest, lambda1se
 
 immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
     ni::Int               # Number of predictors
@@ -366,13 +366,26 @@ immutable GLMNetCrossValidation
     stdloss::Vector{Float64}
 end
 
+function lambdabest(cv::GLMNetCrossValidation)
+    i = indmin(cv.meanloss)
+    (cv.lambda[i], i)
+end
+
+function lambda1se(cv::GLMNetCrossValidation)
+    se = std( cv.meanloss ) / sqrt(length(cv.meanloss))
+    lambda_1se_ind = findlast( cv.meanloss .< (minimum(cv.meanloss) + se) )
+    lambda_1se = cv.lambda[lambda_1se_ind]
+    (lambda_1se, lambda_1se_ind)
+end
+
 function show(io::IO, cv::GLMNetCrossValidation)
     g = cv.path
     println(io, "$(modeltype(g.family)) GLMNet Cross Validation")
     println(io, "$(length(cv.lambda)) models for $(size(g.betas, 1)) predictors in $(cv.nfolds) folds")
-    x, i = findmin(cv.meanloss)
-    @printf io "Best λ %.3f (mean loss %.3f, std %.3f)" cv.lambda[i] x cv.stdloss[i]
-    print(io, )
+    x, i = lambdabest(cv)
+    @printf io "Best λ %.3f (mean loss %.3f, std %.3f)\n" x cv.meanloss[i] cv.stdloss[i]
+    lambda_1se, lambda_1se_i = lambda1se(cv)
+    @printf io "Min. λ within 1 SE of best %.3f (mean loss %.3f, std %.3f)\n" lambda_1se cv.meanloss[lambda_1se_i] cv.stdloss[lambda_1se_i]
 end
 
 function glmnetcv(X::AbstractMatrix, y::@compat(Union{AbstractVector,AbstractMatrix}),
