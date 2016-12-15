@@ -1,5 +1,5 @@
 module GLMNet
-using DataFrames, Distributions, Compat
+using Distributions, Compat, StatsBase
 
 const libglmnet = joinpath(dirname(@__FILE__), "..", "deps", "libglmnet")
 
@@ -196,7 +196,7 @@ modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
-    print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
+    print(io, CoefTable([nactive(g.betas), g.dev_ratio, g.lambda], ["df", "pct_dev", "λ"], []))
 end
 
 function check_jerr(jerr, maxit)
