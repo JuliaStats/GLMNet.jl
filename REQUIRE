@@ -1,4 +1,4 @@
-julia 0.3
-DataFrames
+julia 0.4
 Distributions
-Compat
+StatsBase
+Compat 0.9.3

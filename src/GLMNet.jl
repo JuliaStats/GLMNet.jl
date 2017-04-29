@@ -1,7 +1,7 @@
 module GLMNet
-using DataFrames, Distributions, Compat
+using Distributions, Compat, StatsBase
 
-const libglmnet = joinpath(Pkg.dir("GLMNet"), "deps", "libglmnet.so")
+const libglmnet = joinpath(dirname(@__FILE__), "..", "deps", "libglmnet")
 
 import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
@@ -35,8 +35,7 @@ function getindex(X::CompressedPredictorMatrix, a::AbstractVector{Int}, b::Int)
     end
     out
 end
-
-function getindex(X::CompressedPredictorMatrix, a::@compat(Union{Int,AbstractVector{Int}}), b::AbstractVector{Int})
+function getindex(X::CompressedPredictorMatrix, a::AbstractVector{Int}, b::AbstractVector{Int})
     checkbounds(X, a, b)
     out = zeros(length(a), length(b))
     for j = 1:length(b), i = 1:X.nin[b[j]]
@@ -45,6 +44,24 @@ function getindex(X::CompressedPredictorMatrix, a::@compat(Union{Int,AbstractVec
         end
     end
     out
+end
+
+
+if VERSION < v"0.5.0"
+    # use old slicing behaviour
+    getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int}) = getindex(X,[a],b)
+else
+    # use new slicing behaviour
+    function getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int})
+        checkbounds(X, a, b)
+        out = zeros(length(b))
+        for j = 1:length(b), i = 1:X.nin[b[j]]
+            if a == X.ia[i]
+                out[j] = X.ca[i, b[j]]
+            end
+        end
+        out
+    end
 end
 
 # Get number of active predictors for a model in X
@@ -179,7 +196,7 @@ modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
-    print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
+    print(io, CoefTable(Union{Vector{Int},Vector{Float64}}[nactive(g.betas), g.dev_ratio, g.lambda], ["df", "pct_dev", "λ"], []))
 end
 
 function check_jerr(jerr, maxit)
