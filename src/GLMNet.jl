@@ -8,7 +8,7 @@ const libglmnet = joinpath(dirname(@__FILE__), "..", "deps", "libglmnet")
 import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
 
-immutable CompressedPredictorMatrix <: AbstractMatrix{Float64}
+struct CompressedPredictorMatrix <: AbstractMatrix{Float64}
     ni::Int               # Number of predictors
     ca::Matrix{Float64}   # Predictor values
     ia::Vector{Int32}     # Predictor indices
@@ -85,7 +85,7 @@ function show(io::IO, X::CompressedPredictorMatrix)
     Base.showarray(io, convert(Matrix, X); header=false)
 end
 
-immutable GLMNetPath{F<:Distribution}
+struct GLMNetPath{F<:Distribution}
     family::F
     a0::Vector{Float64}              # intercept values for each solution
     betas::CompressedPredictorMatrix # coefficient values for each solution
@@ -101,7 +101,7 @@ end
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repmat(path.a0[model].', sz, 1)
 function predict(path::GLMNetPath, X::AbstractMatrix,
-                 model::@compat(Union{Int,AbstractVector{Int}})=1:length(path.a0))
+                 model::Union{Int,AbstractVector{Int}}=1:length(path.a0))
     betas = path.betas
     ca = betas.ca
     ia = betas.ia
@@ -121,13 +121,13 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
     y
 end
 
-abstract Loss
-immutable MSE <: Loss
+abstract type Loss end
+struct MSE <: Loss
     y::Vector{Float64}
 end
 loss(l::MSE, i, mu) = abs2(l.y[i] - mu)
 
-immutable LogisticDeviance <: Loss
+struct LogisticDeviance <: Loss
     y::Matrix{Float64}
     fulldev::Vector{Float64}    # Deviance of model with parameter for each y
 end
@@ -145,7 +145,7 @@ function loss(l::LogisticDeviance, i, mu)
     2.0*(l.fulldev[i] - (l.y[i, 1]*log1p(-lf) + l.y[i, 2]*log(lf)))
 end
 
-immutable PoissonDeviance <: Loss
+struct PoissonDeviance <: Loss
     y::Vector{Float64}
     fulldev::Vector{Float64}    # Deviance of model with parameter for each y
 end
@@ -168,10 +168,10 @@ end
 # Compute deviance for given model(s) with the predictors in X versus known
 # responses in y with the given weight
 function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
-              y::@compat(Union{AbstractVector{Float64}, AbstractMatrix{Float64}}),
+              y::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               lossfun::Loss=devloss(path.family, y),
-              model::@compat(Union{Int, AbstractVector{Int}})=1:length(path.a0))
+              model::Union{Int, AbstractVector{Int}}=1:length(path.a0))
     validate_x_y_weights(X, y, weights)
     mu = predict(path, X, model)
     devs = zeros(size(mu, 2))
@@ -180,7 +180,7 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
     end
     devs/sum(weights)
 end
-loss(path::GLMNetPath, X::AbstractMatrix, y::@compat(Union{AbstractVector, AbstractMatrix}),
+loss(path::GLMNetPath, X::AbstractMatrix, y::Union{AbstractVector, AbstractMatrix},
      weights::AbstractVector=ones(size(y, 1)), va...) =
   loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
        convert(Vector{Float64}, weights), va...)
@@ -249,7 +249,7 @@ macro check_and_return()
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        GLMNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], @compat Int(nlp[1]))
+        GLMNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
     end)
 end
 
@@ -286,7 +286,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
-             offsets::@compat(Union{Vector{Float64},Void})=nothing,
+             offsets::Union{Vector{Float64},Void}=nothing,
              weights::Vector{Float64}=ones(size(y, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -302,7 +302,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
-    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(size(y, 1)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, Void) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
     null_dev = Array(Float64, 1)
@@ -333,7 +333,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Poisson;
-             offsets::@compat(Union{Vector{Float64},Void})=nothing,
+             offsets::Union{Vector{Float64},Void}=nothing,
              weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -345,7 +345,7 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
     @validate_and_init
     null_dev = Array(Float64, 1)
 
-    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(length(y)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, Void) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
     ccall((:fishnet_, libglmnet), Void,
@@ -371,7 +371,7 @@ glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
 glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
-immutable GLMNetCrossValidation
+struct GLMNetCrossValidation
     path::GLMNetPath
     nfolds::Int
     lambda::Vector{Float64}
@@ -388,7 +388,7 @@ function show(io::IO, cv::GLMNetCrossValidation)
     print(io, )
 end
 
-function glmnetcv(X::AbstractMatrix, y::@compat(Union{AbstractVector,AbstractMatrix}),
+function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
                   family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
