@@ -305,7 +305,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     offsets::Vector{Float64} = isa(offsets, Void) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
-    null_dev = Array(Float64, 1)
+    null_dev = Vector{Float64}(1)
 
     # The Fortran code expects positive responses in first column, but
     # this convention is evidently unacceptable to the authors of the R
@@ -343,7 +343,7 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    null_dev = Array(Float64, 1)
+    null_dev = Vector{Float64}(1)
 
     offsets::Vector{Float64} = isa(offsets, Void) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")

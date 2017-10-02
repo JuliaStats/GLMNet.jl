@@ -354,7 +354,7 @@ path = glmnet(X, y, Poisson())
 
 # Make sure we can handle zeros in data
 path = glmnet([1 1; 2 2; 3 4], [0, 0, 1], Poisson())
-@test !any(isnan(GLMNet.loss(path, [1 1; 2 2; 4 4], [0, 0, 1])))
+@test !any(isnan, GLMNet.loss(path, [1 1; 2 2; 4 4], [0, 0, 1]))
 
 # Cross-validation
 cv = glmnetcv(X, y, Poisson(); folds=[1,1,1,1,2,2,2,3,3,3])
