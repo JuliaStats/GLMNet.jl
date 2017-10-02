@@ -72,7 +72,7 @@ end
 nactive(X::CompressedPredictorMatrix, b::AbstractVector{Int}=1:length(X.nin)) =
     [nactive(X, j) for j in b]
 
-function convert{T<:Matrix{Float64}}(::Type{T}, X::CompressedPredictorMatrix)
+function convert(::Type{Matrix{Float64}}, X::CompressedPredictorMatrix)
     mat = zeros(X.ni, length(X.nin))
     for b = 1:size(mat, 2), i = 1:X.nin[b]
         mat[X.ia[i], b] = X.ca[i, b]
