@@ -1,3 +1,5 @@
+__precompile__()
+
 module GLMNet
 using Distributions, Compat, StatsBase
 
@@ -47,21 +49,15 @@ function getindex(X::CompressedPredictorMatrix, a::AbstractVector{Int}, b::Abstr
 end
 
 
-if VERSION < v"0.5.0"
-    # use old slicing behaviour
-    getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int}) = getindex(X,[a],b)
-else
-    # use new slicing behaviour
-    function getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int})
-        checkbounds(X, a, b)
-        out = zeros(length(b))
-        for j = 1:length(b), i = 1:X.nin[b[j]]
-            if a == X.ia[i]
-                out[j] = X.ca[i, b[j]]
-            end
+function getindex(X::CompressedPredictorMatrix, a::Int, b::AbstractVector{Int})
+    checkbounds(X, a, b)
+    out = zeros(length(b))
+    for j = 1:length(b), i = 1:X.nin[b[j]]
+        if a == X.ia[i]
+            out[j] = X.ca[i, b[j]]
         end
-        out
     end
+    out
 end
 
 # Get number of active predictors for a model in X

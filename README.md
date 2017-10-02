@@ -1,7 +1,7 @@
 # GLMNet
 
-[![Build Status](https://travis-ci.org/simonster/GLMNet.jl.svg?branch=master)](https://travis-ci.org/simonster/GLMNet.jl)
-[![Coverage Status](https://coveralls.io/repos/simonster/GLMNet.jl/badge.svg?branch=master)](https://coveralls.io/r/simonster/GLMNet.jl?branch=master)
+[![Build Status](https://travis-ci.org/JuliaStats/GLMNet.jl.svg?branch=v0.0.4)](https://travis-ci.org/JuliaStats/GLMNet.jl)
+[![Coverage Status](https://coveralls.io/repos/github/JuliaStats/GLMNet.jl/badge.svg)](https://coveralls.io/github/JuliaStats/GLMNet.jl)
 
 [glmnet](http://www.jstatsoft.org/v33/i01/) is an R package by Jerome Friedman, Trevor Hastie, Rob Tibshirani that fits entire Lasso or ElasticNet regularization paths for linear, logistic, multinomial, and Cox models using cyclic coordinate descent. This Julia package wraps the Fortran code from glmnet.
 
@@ -34,9 +34,9 @@ Least Squares GLMNet Solution Path (55 solutions for 4 predictors in 163 passes)
 ```julia
 julia> path.betas
 4x55 CompressedPredictorMatrix:
- 0.0  0.083706  0.159976  0.22947  …  0.929157    0.929315  
+ 0.0  0.083706  0.159976  0.22947  …  0.929157    0.929315
  0.0  0.0       0.0       0.0         0.00655753  0.00700862
- 0.0  0.0       0.0       0.0         0.0         0.0       
+ 0.0  0.0       0.0       0.0         0.0         0.0
  0.0  0.0       0.0       0.0         0.0         0.0
 ```
 
@@ -63,9 +63,9 @@ julia> indmin(cv.meanloss)
 
 julia> cv.path.betas[:, 48]
 4-element Array{Float64,1}:
- 0.926911  
+ 0.926911
  0.00366805
- 0.0       
+ 0.0
  0.0
 ```
 
