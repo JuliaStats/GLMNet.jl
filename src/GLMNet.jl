@@ -229,11 +229,11 @@ macro validate_and_init()
 
         lmu = Int32[0]
         a0 = zeros(Float64, nlambda)
-        ca = Array(Float64, pmax, nlambda)
-        ia = Array(Int32, pmax)
-        nin = Array(Int32, nlambda)
-        fdev = Array(Float64, nlambda)
-        alm = Array(Float64, nlambda)
+        ca = Matrix{Float64}(pmax, nlambda)
+        ia = Vector{Int32}(pmax)
+        nin = Vector{Int32}(nlambda)
+        fdev = Vector{Float64}(nlambda)
+        alm = Vector{Float64}(nlambda)
         nlp = Int32[0]
         jerr = Int32[0]
     end)
@@ -266,14 +266,14 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
     @validate_and_init
 
     ccall((:elnet_, libglmnet), Void,
-          (Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Float64}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
+          (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
+           Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
            Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
-          &(naivealgorithm ? 2 : 1), &alpha, &size(X, 1), &size(X, 2), X, y, weights, &0,
-          penalty_factor, constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol,
-          &standardize, &intercept, &maxit, lmu, a0, ca, ia, nin, fdev, alm, nlp, jerr)
+          (naivealgorithm ? 2 : 1), alpha, size(X, 1), size(X, 2), X, y, weights, 0,
+          penalty_factor, constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda, tol,
+          standardize, intercept, maxit, lmu, a0, ca, ia, nin, fdev, alm, nlp, jerr)
 
     null_dev = 0.0
     mu = mean(y)
@@ -305,7 +305,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     offsets::Vector{Float64} = isa(offsets, Void) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
-    null_dev = Array(Float64, 1)
+    null_dev = Vector{Float64}(1)
 
     # The Fortran code expects positive responses in first column, but
     # this convention is evidently unacceptable to the authors of the R
@@ -318,14 +318,14 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     end
 
     ccall((:lognet_, libglmnet), Void,
-          (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Float64},  Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
+           Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
-          &alpha, &size(X, 1), &size(X, 2), &1, X, y, copy(offsets), &0, penalty_factor,
-          constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
-          &intercept, &maxit, &kopt, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+          alpha, size(X, 1), size(X, 2), 1, X, y, copy(offsets), 0, penalty_factor,
+          constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda, tol, standardize,
+          intercept, maxit, kopt, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
 
     null_dev = null_dev[1]
     @check_and_return
@@ -343,20 +343,20 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    null_dev = Array(Float64, 1)
+    null_dev = Vector{Float64}(1)
 
     offsets::Vector{Float64} = isa(offsets, Void) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
     ccall((:fishnet_, libglmnet), Void,
-          (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
+           Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
-          &alpha, &size(X, 1), &size(X, 2), X, y, offsets, weights, &0, penalty_factor,
-          constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
-          &intercept, &maxit, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+          alpha, size(X, 1), size(X, 2), X, y, offsets, weights, 0, penalty_factor,
+          constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda, tol, standardize,
+          intercept, maxit, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
 
     null_dev = null_dev[1]
     @check_and_return
@@ -415,7 +415,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     fits = (parallel ? pmap : map)(1:nfolds) do i
         f = folds .== i
         holdoutidx = find(f)
-        modelidx = find(!f)
+        modelidx = find(!, f)
         g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
                     weights=weights[modelidx], lambda=path.lambda, kw...)
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
