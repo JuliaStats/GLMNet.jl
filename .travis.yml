@@ -1,16 +1,17 @@
 language: julia
 os:
   - linux
+addons:
+  apt:
+    packages:
+      - gfortran
 julia:
-  - 0.4
-  - 0.5
+  - 0.6
   - nightly
 notifications:
   email: false
-before_install:
-  - sudo apt-get install gfortran -y
-script:
-  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("GLMNet"); Pkg.test("GLMNet"; coverage=true)'
+#script:
+#  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+#  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("GLMNet"); Pkg.test("GLMNet"; coverage=true)'
 after_success:
-  - if [ $TRAVIS_JULIA_VERSION = "nightly" ]; then julia -e 'cd(Pkg.dir("GLMNet")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'; fi
+  - julia -e 'cd(Pkg.dir("GLMNet")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'

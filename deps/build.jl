@@ -1,5 +1,5 @@
 using Compat
-@static if is_windows()
+if Compat.Sys.iswindows()
     flags = ["-m$(Sys.WORD_SIZE)","-fdefault-real-8","-ffixed-form","-shared","-O3"]
 else
     flags = ["-m$(Sys.WORD_SIZE)","-fdefault-real-8","-ffixed-form","-shared","-O3","-fPIC"]
