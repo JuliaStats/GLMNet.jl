@@ -283,6 +283,36 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
 
     @check_and_return
 end
+function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
+             family::Normal=Normal();
+             weights::Vector{Float64}=ones(length(y)),
+             naivealgorithm::Bool=(size(X, 2) >= 500), alpha::Real=1.0,
+             penalty_factor::Vector{Float64}=ones(size(X, 2)),
+             constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
+             dfmax::Int=size(X, 2), pmax::Int=min(dfmax*2+20, size(X, 2)), nlambda::Int=100,
+             lambda_min_ratio::Real=(length(y) < size(X, 2) ? 1e-2 : 1e-4),
+             lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
+             intercept::Bool=true, maxit::Int=1000000)
+    @validate_and_init
+
+    ccall((:spelnet_, libglmnet), Void,
+          (Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},
+           Ptr{Float64}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
+           Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+          &(naivealgorithm ? 2 : 1), &alpha, &size(X, 1), &size(X, 2), X.nzval, X.colptr, X.rowval, y, weights, &0,
+          penalty_factor, constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol,
+          &standardize, &intercept, &maxit, lmu, a0, ca, ia, nin, fdev, alm, nlp, jerr)
+
+    null_dev = 0.0
+    mu = mean(y)
+    for i = 1:length(y)
+        null_dev += abs2(null_dev-mu)
+    end
+
+    @check_and_return
+end
 
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
@@ -330,6 +360,52 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     null_dev = null_dev[1]
     @check_and_return
 end
+function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
+             family::Binomial;
+             offsets::@compat(Union{Vector{Float64},Void})=nothing,
+             weights::Vector{Float64}=ones(size(y, 1)),
+             alpha::Real=1.0,
+             penalty_factor::Vector{Float64}=ones(size(X, 2)),
+             constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
+             dfmax::Int=size(X, 2), pmax::Int=min(dfmax*2+20, size(X, 2)), nlambda::Int=100,
+             lambda_min_ratio::Real=(length(y) < size(X, 2) ? 1e-2 : 1e-4),
+             lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
+             intercept::Bool=true, maxit::Int=1000000, algorithm::Symbol=:newtonraphson)
+    @validate_and_init
+    size(y, 2) == 2 || error("glmnet for logistic models requires a two-column matrix with "*
+                             "counts of negative responses in the first column and positive "*
+                             "responses in the second")
+    kopt = algorithm == :newtonraphson ? 0 :
+           algorithm == :modifiednewtonraphson ? 1 :
+           algorithm == :nzsame ? 2 : error("unknown algorithm ")
+    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(size(y, 1)) : copy(offsets)
+    length(offsets) == size(y, 1) || error("length of offsets must match length of y")
+
+    null_dev = Array(Float64, 1)
+
+    # The Fortran code expects positive responses in first column, but
+    # this convention is evidently unacceptable to the authors of the R
+    # code, and, apparently, to us
+    for i = 1:size(y, 1)
+        a = y[i, 1]
+        b = y[i, 2]
+        y[i, 1] = b*weights[i]
+        y[i, 2] = a*weights[i]
+    end
+
+    ccall((:splognet_, libglmnet), Void,
+          (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},
+           Ptr{Float64},  Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+          &alpha, &size(X, 1), &size(X, 2), &1, X.nzval, X.colptr, X.rowval, y, copy(offsets), &0, penalty_factor,
+          constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
+          &intercept, &maxit, &kopt, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+
+    null_dev = null_dev[1]
+    @check_and_return
+end
 
 function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Poisson;
@@ -361,13 +437,47 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
     null_dev = null_dev[1]
     @check_and_return
 end
+function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
+             family::Poisson;
+             offsets::@compat(Union{Vector{Float64},Void})=nothing,
+             weights::Vector{Float64}=ones(length(y)),
+             alpha::Real=1.0,
+             penalty_factor::Vector{Float64}=ones(size(X, 2)),
+             constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
+             dfmax::Int=size(X, 2), pmax::Int=min(dfmax*2+20, size(X, 2)), nlambda::Int=100,
+             lambda_min_ratio::Real=(length(y) < size(X, 2) ? 1e-2 : 1e-4),
+             lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
+             intercept::Bool=true, maxit::Int=1000000)
+    @validate_and_init
+    null_dev = Array(Float64, 1)
+
+    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(length(y)) : copy(offsets)
+    length(offsets) == length(y) || error("length of offsets must match length of y")
+
+    ccall((:spfishnet_, libglmnet), Void,
+          (Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64},
+           Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
+           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+          &alpha, &size(X, 1), &size(X, 2), X.nzval, X.colptr, X.rowval, y, offsets, weights, &0, penalty_factor,
+          constraints, &dfmax, &pmax, &nlambda, &lambda_min_ratio, lambda, &tol, &standardize,
+          &intercept, &maxit, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+
+    null_dev = null_dev[1]
+    @check_and_return
+end
 
 glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
 glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), family; kw...)
+glmnet(X::SparseMatrixCSC, y::AbstractVector, family::Distribution=Normal(); kw...) =
+    glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Vector{Float64}, y), family; kw...)
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
+glmnet(X::SparseMatrixCSC, y::AbstractMatrix, family::Binomial; kw...) =
+    glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Matrix{Float64}, y), family; kw...)
 glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
