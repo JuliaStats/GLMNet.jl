@@ -1,4 +1,4 @@
 julia 0.6
 Distributions
 StatsBase
-Compat 0.27
+Compat 0.50

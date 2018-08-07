@@ -1,4 +1,5 @@
-using GLMNet, Distributions, Base.Test
+using GLMNet, Distributions, Compat
+using Compat.SparseArrays, Compat.Test
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
@@ -139,7 +140,7 @@ cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
                     39.0299829401119,38.6558452183199,38.3368612982388,37.7398448319383,
                     37.046892340522,35.445787686226,33.8969088663738,32.3960089022261,
                     31.1017204353906]
-@test cv.lambda[indmin(cv.meanloss)] ≈ 4.110862702400506
+@test cv.lambda[argmin(cv.meanloss)] ≈ 4.110862702400506
 
 # Make sure show works
 show(IOBuffer(), cv)
@@ -295,7 +296,7 @@ cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
                     0.00961220428730636,0.00924288229652947,0.00888668566464586,
                     0.00853733802211561,0.00820380789674434,0.00788213606478372,
                     0.00757252943821209,0.00727455485747877,0.00698779845948223]
-@test cv.lambda[indmin(cv.meanloss)] ≈ 0.0004835015175294886
+@test cv.lambda[argmin(cv.meanloss)] ≈ 0.0004835015175294886
 
 # Make sure show works
 show(IOBuffer(), cv)
@@ -452,7 +453,7 @@ cv = glmnetcv(X, y, Poisson(); folds=[1,1,1,1,2,2,2,3,3,3])
                     37.8623065808433,38.9298616880719,39.96822172491,
                     40.942379819046,41.8717798806583,42.7470115700663,
                     43.5811301275153,44.3783103885374,45.1212386961703]
-@test cv.lambda[indmin(cv.meanloss)] ≈ 4.951548678559192
+@test cv.lambda[argmin(cv.meanloss)] ≈ 4.951548678559192
 
 # Make sure show works
 show(IOBuffer(), cv)

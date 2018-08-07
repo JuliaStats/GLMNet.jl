@@ -2,6 +2,7 @@ __precompile__()
 
 module GLMNet
 using Distributions, Compat, StatsBase
+using Compat.Distributed, Compat.Printf, Compat.Random, Compat.SparseArrays
 
 const libglmnet = joinpath(dirname(@__FILE__), "..", "deps", "libglmnet")
 
@@ -99,14 +100,14 @@ end
 # Compute the model response to predictors in X
 # No inverse link is applied
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
-makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repmat(path.a0[model].', sz, 1)
+makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repeat(transpose(path.a0[model]), outer=(sz, 1))
 function predict(path::GLMNetPath, X::AbstractMatrix,
                  model::Union{Int,AbstractVector{Int}}=1:length(path.a0))
     betas = path.betas
     ca = betas.ca
     ia = betas.ia
     nin = betas.nin
-    
+
     y = makepredictmat(path, size(X, 1), model)
     for b = 1:length(model)
         m = model[b]
@@ -160,9 +161,9 @@ devloss(::Poisson, y) = PoissonDeviance(y)
 # Check the dimensions of X, y, and weights
 function validate_x_y_weights(X, y, weights)
     size(X, 1) == size(y, 1) ||
-        error(Base.LinAlg.DimensionMismatch("length of y must match rows in X"))
+        error(DimensionMismatch("length of y must match rows in X"))
     length(weights) == size(y, 1) ||
-        error(Base.LinAlg.DimensionMismatch("length of weights must match y"))
+        error(DimensionMismatch("length of weights must match y"))
 end
 
 # Compute deviance for given model(s) with the predictors in X versus known
@@ -213,9 +214,9 @@ macro validate_and_init()
     esc(quote
         validate_x_y_weights(X, y, weights)
         length(penalty_factor) == size(X, 2) ||
-            error(Base.LinAlg.DimensionMismatch("length of penalty_factor must match rows in X"))
+            error(DimensionMismatch("length of penalty_factor must match rows in X"))
         (size(constraints, 1) == 2 && size(constraints, 2) == size(X, 2)) ||
-            error(Base.LinAlg.DimensionMismatch("contraints must be a 2 x n matrix"))
+            error(DimensionMismatch("contraints must be a 2 x n matrix"))
         0 <= lambda_min_ratio <= 1 || error("lambda_min_ratio must be in range [0.0, 1.0]")
 
         if !isempty(lambda)
@@ -229,11 +230,11 @@ macro validate_and_init()
 
         lmu = Int32[0]
         a0 = zeros(Float64, nlambda)
-        ca = Matrix{Float64}(pmax, nlambda)
-        ia = Vector{Int32}(pmax)
-        nin = Vector{Int32}(nlambda)
-        fdev = Vector{Float64}(nlambda)
-        alm = Vector{Float64}(nlambda)
+        ca = Matrix{Float64}(undef, pmax, nlambda)
+        ia = Vector{Int32}(undef, pmax)
+        nin = Vector{Int32}(undef, nlambda)
+        fdev = Vector{Float64}(undef, nlambda)
+        alm = Vector{Float64}(undef, nlambda)
         nlp = Int32[0]
         jerr = Int32[0]
     end)
@@ -265,7 +266,7 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
 
-    ccall((:elnet_, libglmnet), Void,
+    ccall((:elnet_, libglmnet), Nothing,
           (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
            Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32},
            Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
@@ -295,7 +296,7 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
 
-    ccall((:spelnet_, libglmnet), Void,
+    ccall((:spelnet_, libglmnet), Nothing,
           (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
            Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64},
@@ -317,7 +318,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
              family::Binomial;
-             offsets::Union{Vector{Float64},Void}=nothing,
+             offsets::Union{Vector{Float64},Nothing}=nothing,
              weights::Vector{Float64}=ones(size(y, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -333,10 +334,10 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
-    offsets::Vector{Float64} = isa(offsets, Void) ? zeros(size(y, 1)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
-    null_dev = Vector{Float64}(1)
+    null_dev = Vector{Float64}(undef, 1)
 
     # The Fortran code expects positive responses in first column, but
     # this convention is evidently unacceptable to the authors of the R
@@ -348,7 +349,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
         y[i, 2] = a*weights[i]
     end
 
-    ccall((:lognet_, libglmnet), Void,
+    ccall((:lognet_, libglmnet), Nothing,
           (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
            Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32},
            Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
@@ -363,7 +364,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
 end
 function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
              family::Binomial;
-             offsets::Union{Vector{Float64},Void}=nothing,
+             offsets::Union{Vector{Float64},Nothing}=nothing,
              weights::Vector{Float64}=ones(size(y, 1)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -379,10 +380,10 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
-    offsets::Vector{Float64} = isa(offsets, @compat Void) ? zeros(size(y, 1)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, @compat Nothing) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
-    null_dev = Vector{Float64}(1)
+    null_dev = Vector{Float64}(undef, 1)
 
     # The Fortran code expects positive responses in first column, but
     # this convention is evidently unacceptable to the authors of the R
@@ -394,7 +395,7 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
         y[i, 2] = a*weights[i]
     end
 
-    ccall((:splognet_, libglmnet), Void,
+    ccall((:splognet_, libglmnet), Nothing,
           (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Int32},
            Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
            Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64},
@@ -412,7 +413,7 @@ end
 
 function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              family::Poisson;
-             offsets::Union{Vector{Float64},Void}=nothing,
+             offsets::Union{Vector{Float64},Nothing}=nothing,
              weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -422,12 +423,12 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    null_dev = Vector{Float64}(1)
+    null_dev = Vector{Float64}(undef, 1)
 
-    offsets::Vector{Float64} = isa(offsets, Void) ? zeros(length(y)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
-    ccall((:fishnet_, libglmnet), Void,
+    ccall((:fishnet_, libglmnet), Nothing,
           (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
            Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32},
            Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32},
@@ -442,7 +443,7 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
 end
 function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
              family::Poisson;
-             offsets::Union{Vector{Float64},Void}=nothing,
+             offsets::Union{Vector{Float64},Nothing}=nothing,
              weights::Vector{Float64}=ones(length(y)),
              alpha::Real=1.0,
              penalty_factor::Vector{Float64}=ones(size(X, 2)),
@@ -452,12 +453,12 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    null_dev = Vector{Float64}(1)
+    null_dev = Vector{Float64}(undef, 1)
 
-    offsets::Vector{Float64} = isa(offsets, Void) ? zeros(length(y)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
-    ccall((:spfishnet_, libglmnet), Void,
+    ccall((:spfishnet_, libglmnet), Nothing,
           (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
            Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
            Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64},
@@ -508,7 +509,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
-                      shuffle!([repmat(1:nfolds, n); 1:r])
+                      shuffle!([repeat(1:nfolds, outer=n); 1:r])
                   end, parallel::Bool=false, kw...)
     # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
@@ -521,6 +522,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     # We shouldn't pass on nlambda and lambda_min_ratio if the user
     # specified these, since that would make us throw errors, and this
     # is entirely determined by the lambda values we will pass
+    kw = collect(kw)
     filter!(kw) do akw
         kwname = akw[1]
         kwname != :nlambda && kwname != :lambda_min_ratio && kwname != :lambda
@@ -529,8 +531,8 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     # Do model fits and compute loss for each
     fits = (parallel ? pmap : map)(1:nfolds) do i
         f = folds .== i
-        holdoutidx = find(f)
-        modelidx = find(!, f)
+        holdoutidx = findall(f)
+        modelidx = findall(!, f)
         g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
                     weights=weights[modelidx], lambda=path.lambda, kw...)
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
