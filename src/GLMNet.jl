@@ -1,8 +1,8 @@
 __precompile__()
 
 module GLMNet
-using Distributions, Compat, StatsBase
-using Compat.Distributed, Compat.Printf, Compat.Random, Compat.SparseArrays
+using Distributions, StatsBase
+using Distributed, Printf, Random, SparseArrays
 
 const libglmnet = joinpath(dirname(@__FILE__), "..", "deps", "libglmnet")
 
@@ -380,7 +380,7 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
     kopt = algorithm == :newtonraphson ? 0 :
            algorithm == :modifiednewtonraphson ? 1 :
            algorithm == :nzsame ? 2 : error("unknown algorithm ")
-    offsets::Vector{Float64} = isa(offsets, @compat Nothing) ? zeros(size(y, 1)) : copy(offsets)
+    offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
     null_dev = Vector{Float64}(undef, 1)
