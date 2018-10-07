@@ -58,7 +58,7 @@ Least Squares GLMNet Cross Validation
 55 models for 4 predictors in 10 folds
 Best λ 0.343 (mean loss 76.946, std 12.546)
 
-julia> indmin(cv.meanloss)
+julia> argmin(cv.meanloss)
 48
 
 julia> cv.path.betas[:, 48]
