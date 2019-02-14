@@ -1,1 +1,3 @@
 libglmnet.*
+usr/
+deps.jl
