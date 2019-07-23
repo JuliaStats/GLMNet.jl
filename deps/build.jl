@@ -74,11 +74,7 @@ if dl_info === nothing && unsatisfied
     run(`gfortran $flags glmnet5.f90 -o libglmnet.$(Libdl.dlext)`)
 
     write(joinpath(@__DIR__, "deps.jl"), """
-        if isdefined((@static VERSION < v"0.7.0-DEV.484" ? current_module() : @__MODULE__), :Compat)
-            import Compat.Libdl
-        elseif VERSION >= v"0.7.0-DEV.3382"
-            import Libdl
-        end
+        import Libdl
 
         function check_deps()
             global libglmnet

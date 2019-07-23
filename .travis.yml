@@ -5,6 +5,8 @@ os:
 julia:
   - 0.7
   - 1.0
+  - 1.1
+  - 1.2
   - nightly
 notifications:
   email: false
@@ -12,4 +14,4 @@ notifications:
 #  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
 #  - julia --check-bounds=yes -e 'Pkg.clone(pwd()); Pkg.build("GLMNet"); Pkg.test("GLMNet"; coverage=true)'
 after_success:
-  - julia -e 'cd(Pkg.dir("GLMNet")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'using Pkg; Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
