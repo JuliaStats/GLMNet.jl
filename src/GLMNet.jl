@@ -214,9 +214,9 @@ function check_jerr(jerr, maxit)
     elseif jerr == 1000
         error("glmnet: all predictors are unpenalized")
     elseif -10001 < jerr < 0
-        warn("glment: convergence for $(-jerr)th lambda value not reached after $maxit iterations")
+        @warn("glment: convergence for $(-jerr)th lambda value not reached after $maxit iterations")
     elseif jerr < -10000
-        warn("glmnet: number of non-zero coefficients along path exceeds $nx at $(maxit+10000)th lambda value")
+        @warn("glmnet: number of non-zero coefficients along path exceeds $nx at $(maxit+10000)th lambda value")
     end
 end
 
