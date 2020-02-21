@@ -1,20 +1,9 @@
-__precompile__()
-
 module GLMNet
+
+using glmnet_jll
 using Distributions, StatsBase
 using Distributed, Printf, Random, SparseArrays
 
-
-depsjl = joinpath(@__DIR__, "..", "deps", "deps.jl")
-if isfile(depsjl)
-    include(depsjl)
-else
-    error("GLMNet not properly installed. Please run Pkg.build(\"GLMNet\") and restart julia")
-end
-
-function __init__()
-    check_deps()
-end
 
 import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
