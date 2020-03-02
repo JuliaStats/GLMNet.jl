@@ -537,7 +537,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
              weights[holdoutidx])
     end
-    minLength = minabs([size(x)[1] for x in fits])
+    minLength = minimum([size(x)[1] for x in fits])
     fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64} # This is throwing an error in relation to 382
 
     ninfold = zeros(Int, nfolds)
