@@ -298,7 +298,6 @@ cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
                     0.00757252943821209,0.00727455485747877,0.00698779845948223]
 @test cv.lambda[argmin(cv.meanloss)] ≈ 0.0004835015175294886
 
-
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)

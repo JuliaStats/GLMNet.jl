@@ -537,8 +537,10 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
              weights[holdoutidx])
     end
-    minLength = minimum([size(x)[1] for x in fits])
-    fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64} # This is throwing an error in relation to 382
+    # Different numbers of lambdas may have converged for each fold, so trim all
+    # loss vectors to the same length before aggregating
+    minLength = minimum(length.(fits))
+    fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64}
 
     ninfold = zeros(Int, nfolds)
     for f in folds
