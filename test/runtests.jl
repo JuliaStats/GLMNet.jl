@@ -1,5 +1,5 @@
 using GLMNet, Distributions
-using SparseArrays, Test
+using Random, SparseArrays, Test
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
@@ -145,6 +145,16 @@ cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
+
+# Passing RNG makes cv deterministic
+cv1 = glmnetcv(X, y)
+cv2 = glmnetcv(X, y)
+@test cv1.meanloss ≉ cv2.meanloss
+@test cv1.stdloss ≉ cv2.stdloss
+cv3 = glmnetcv(X, y; rng=MersenneTwister(1))
+cv4 = glmnetcv(X, y; rng=MersenneTwister(1))
+@test cv3.meanloss ≈ cv4.meanloss
+@test cv3.stdloss ≈ cv4.stdloss
 
 ## LOGISTIC
 yl = [(y .< 50) (y .>= 50)]
@@ -301,6 +311,16 @@ cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
+
+# Passing RNG makes cv deterministic
+cv1 = glmnetcv(X, yl, Binomial())
+cv2 = glmnetcv(X, yl, Binomial())
+@test cv1.meanloss ≉ cv2.meanloss
+@test cv1.stdloss ≉ cv2.stdloss
+cv3 = glmnetcv(X, yl, Binomial(); rng=MersenneTwister(1))
+cv4 = glmnetcv(X, yl, Binomial(); rng=MersenneTwister(1))
+@test cv3.meanloss ≈ cv4.meanloss
+@test cv3.stdloss ≈ cv4.stdloss
 
 # Make sure passing nlambda to glmnetcv works
 cv = glmnetcv(X, y, Poisson(); nlambda=2, lambda_min_ratio=0.01)
@@ -461,6 +481,17 @@ cv = glmnetcv(X, y, Poisson(); folds=[1,1,1,1,2,2,2,3,3,3])
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
+
+# Passing RNG makes cv deterministic
+cv1 = glmnetcv(X, y, Poisson())
+cv2 = glmnetcv(X, y, Poisson())
+@test cv1.meanloss ≉ cv2.meanloss
+@test cv1.stdloss ≉ cv2.stdloss
+cv3 = glmnetcv(X, y, Poisson(); rng=MersenneTwister(1))
+cv4 = glmnetcv(X, y, Poisson(); rng=MersenneTwister(1))
+@test cv3.meanloss ≈ cv4.meanloss
+@test cv3.stdloss ≈ cv4.stdloss
+
 
 ## COMPRESSEDPREDICTORMATRIX
 betas = path.betas
