@@ -5,7 +5,7 @@ using Distributions, StatsBase
 using Distributed, Printf, Random, SparseArrays
 
 
-import Base.getindex, Base.convert, Base.size, Base.show
+import Base.getindex, Base.convert, Base.size, Base.show, DataFrames.predict
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
 
 struct CompressedPredictorMatrix <: AbstractMatrix{Float64}
@@ -82,7 +82,7 @@ end
 
 function show(io::IO, X::CompressedPredictorMatrix)
     println(io, "$(size(X, 1))x$(size(X, 2)) CompressedPredictorMatrix:")
-    Base.showarray(io, convert(Matrix, X); header=false)
+    Base.showarray(io, convert(Matrix{Float64}, X); header=false)
 end
 
 struct GLMNetPath{F<:Distribution}
@@ -101,7 +101,8 @@ end
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repeat(transpose(path.a0[model]), outer=(sz, 1))
 function predict(path::GLMNetPath, X::AbstractMatrix,
-                 model::Union{Int,AbstractVector{Int}}=1:length(path.a0))
+                 model::Union(Int, AbstractVector{Int})=1:length(path.a0);
+                 outtype = :link, offsets = zeros(size(X,1)))
     betas = path.betas
     ca = betas.ca
     ia = betas.ia
@@ -117,7 +118,16 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
             end
         end
     end
-
+    if any(offsets .!= 0)
+        for b = 1:length(model)
+            y[:, b] += offsets
+        end
+    end
+    if isa(path, GLMNetPath{Binomial}) && outtype != :link
+        y = 1. ./ (1. + exp(-y))
+    elseif is(path, GLMNetPath{Poisson}) && outtype != :link
+        y = exp(y)
+    end
     y
 end
 
@@ -171,9 +181,10 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
               y::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               lossfun::Loss=devloss(path.family, y),
-              model::Union{Int, AbstractVector{Int}}=1:length(path.a0))
+              model::Union(Int, AbstractVector{Int})=1:length(path.a0);
+              offsets = zeros(size(X, 1)))
     validate_x_y_weights(X, y, weights)
-    mu = predict(path, X, model)
+    mu = predict(path, X, model; offsets = offsets)
     devs = zeros(size(mu, 2))
     for j = 1:size(mu, 2), i = 1:size(mu, 1)
         devs[j] += loss(lossfun, i, mu[i, j])*weights[i]
@@ -181,13 +192,12 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
     devs/sum(weights)
 end
 loss(path::GLMNetPath, X::AbstractMatrix, y::Union{AbstractVector, AbstractMatrix},
-     weights::AbstractVector=ones(size(y, 1)), va...) =
+     weights::AbstractVector=ones(size(y, 1)), va...; kw...) =
   loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
-       convert(Vector{Float64}, weights), va...)
+       convert(Vector{Float64}, weights), va...; kw...)
 
 modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
-modeltype(::Multinomial) = "Multinomial"
 modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)
@@ -487,7 +497,7 @@ glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
 struct GLMNetCrossValidation
-    path::GLMNetPath
+    path::Any
     nfolds::Int
     lambda::Vector{Float64}
     meanloss::Vector{Float64}
@@ -505,6 +515,7 @@ end
 
 function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
                   family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
+                  offsets::Union(AbstractVector, AbstractMatrix, Nothing)=nothing,
                   rng=Random.GLOBAL_RNG,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
@@ -514,7 +525,13 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
     y = convert(Array{Float64}, y)
-    path = glmnet(X, y, family; kw...)
+    offsets = (offsets != nothing)? offsets : isa(family, Multinomial)?  y*0.0 : zeros(size(X, 1))
+
+    if isa(family, Normal)
+        path = glmnet(X, y, family; weights = weights, kw...)
+    else
+        path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
+    end
 
     # In case user defined folds
     nfolds = maximum(folds)
@@ -532,16 +549,24 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     fits = (parallel ? pmap : map)(1:nfolds) do i
         f = folds .== i
         holdoutidx = findall(f)
-        modelidx = findall(!, f)
-        g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
-                    weights=weights[modelidx], lambda=path.lambda, kw...)
-        loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
-             weights[holdoutidx])
+        modelidx = findall(!,f)
+        if isa(family, Normal)
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                        weights=weights[modelidx], lambda=path.lambda, kw...)
+        else
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                        weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :],
+                        lambda=path.lambda, kw...)
+        end
+        loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :], weights[holdoutidx]; 
+            offsets = isa(offsets, AbstractVector) ? offsets[holdoutidx] : offsets[holdoutidx, :])
     end
-    # Different numbers of lambdas may have converged for each fold, so trim all
-    # loss vectors to the same length before aggregating
-    minLength = minimum(length.(fits))
-    fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64}
+
+    # each fold may result in a smaller number of lambdas
+    lambda = path.lambda[1:minimum(map(length, fits))]
+    fits = map(z->z[1:length(lambda)], fits)
+
+    fitloss = hcat(fits...)::Matrix{Float64}
 
     ninfold = zeros(Int, nfolds)
     for f in folds
@@ -571,4 +596,9 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
 
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
 end
+
+include("Multinomial.jl")
+include("CoxNet.jl")
+include("plot.jl")
+
 end # module

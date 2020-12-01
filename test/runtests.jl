@@ -1,5 +1,5 @@
 using GLMNet, Distributions
-using Random, SparseArrays, Test
+using Random, DataFrames, SparseArrays, Test
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
@@ -102,6 +102,14 @@ path = glmnet(sparse(X), y)
                               69.396354069847447,12.253877034216755,81.104769545494065,
                               17.808632244707766]
 
+# Test plot on path
+plot(path, Scale.x_log10)
+plot(path, x = :deviance)
+plot(path, x = :norm1, y = :absCoefficients)
+plot(path, x = :norm2)
+@test_throws ErrorException plot(path, x = :Coeff)
+@test_throws ErrorException plot(path, y = :Coeff)
+
 # Cross-validation
 cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
 @test cv.meanloss ≈ [1196.1831818915,1054.30217435069,882.722957995572,741.473677317198,
@@ -142,9 +150,13 @@ cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
                     31.1017204353906]
 @test cv.lambda[argmin(cv.meanloss)] ≈ 4.110862702400506
 
+# Test nfolds
+glmnetcv(X, y, nfolds = 3)
+
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
+show(IOBuffer(), cv.path.betas)
 
 # Passing RNG makes cv deterministic
 cv1 = glmnetcv(X, y)
@@ -253,6 +265,8 @@ path = glmnet(sparse(X), yl, Binomial())
                               8.017225144937120,-6.891307125813680,5.068602350662909,
                               6.514278565882654,-5.352339338181535,10.448596815251006,
                               -8.571939893775767]
+@test predict(path, X, 60, outtype = :prob, offsets = ones(size(X,1))) ≈
+    1.0 ./ (1.0 + exp(-predict(path, X, 60) - 1))
 
 # Cross-validation
 cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
@@ -307,7 +321,8 @@ cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
                     0.00853733802211561,0.00820380789674434,0.00788213606478372,
                     0.00757252943821209,0.00727455485747877,0.00698779845948223]
 @test cv.lambda[argmin(cv.meanloss)] ≈ 0.0004835015175294886
-
+@test cv.lambda[argmin(cv.meanloss)] ≈ lambdamin(cv)
+@test coef(cv) ≈ [0.0, 0.0, 0.0, 0.0, -0.00856884688365455, 0.2588620125399746]
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
@@ -477,7 +492,8 @@ cv = glmnetcv(X, y, Poisson(); folds=[1,1,1,1,2,2,2,3,3,3])
                     40.942379819046,41.8717798806583,42.7470115700663,
                     43.5811301275153,44.3783103885374,45.1212386961703]
 @test cv.lambda[argmin(cv.meanloss)] ≈ 4.951548678559192
-
+@test cv.lambda[argmin(cv.meanloss)] ≈ lambdamin(cv)
+@test coef(cv) ≈ [0.0, 0,0, 0.0, 0.0, 0.019438180558051972]
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
@@ -505,3 +521,113 @@ for j = 1:size(betas, 2), i = 1:size(betas, 1)
     @test betas[1:i, 1:j] == cbetas[1:i, 1:j]
     @test betas[i:end, j:end] == cbetas[i:end, j:end]
 end
+
+
+## Cox model
+
+dat = [ 31  1  82  0  0  100   90   413   27
+       201  1  73  1  2   70   60  1225  -16
+       243  0  63  1  1   80   90   825    0
+       460  1  70  0  1   80   60   975   10
+       458  0  57  0  1   80  100   513   30
+       245  1  57  1  1   80   60   280   14
+       170  1  57  0  1   80   80  1025   27
+       153  1  73  1  2   60   70  1075   11
+        95  1  76  1  2   60   60   625  -24
+       293  1  59  1  1   80   80   925   52
+       259  0  58  0  0   90   80  1300    8
+       305  1  48  1  1   80   90   538   29
+       110  1  64  0  1   80   60  1025   12
+        13  1  76  0  2   70   70   413   20
+         5  1  65  1  0  100   80   338    5 ]
+cox_lambda = [0.387908320, 0.221975403, 0.127022487, 0.072686937, 0.041594138, 0.023801695, 0.013620205, 0.007793982, 0.004460003, 0.002552178]
+cox_betas = [3.712729e-11  0.0331042241  0.0619681059  0.081933478  0.097242387   0.108962950  0.113602150  0.116747557  0.118753535  0.120028109; 0  0  0.2131420019  0.449263137  0.636003572   0.812610424  0.900595779  0.960331719  0.998588376  1.022193565; 0  0  0  0  0  0  0.688653228  1.142324340  1.403892425  1.551887391; 0  0  0  0  0  0.003637686  0.041763706  0.066758219  0.081252135  0.089471301; 0  0  0  0  -0.002338213  -0.005536699 -0.007206793 -0.008156342 -0.008706105 -0.009021679; 0  -0.0001887916 -0.0009023704 -0.001360778 -0.001651545  -0.001797621 -0.001953574 -0.002068489 -0.002140165 -0.002183498; 0  0  0  0  0.003274005   0.007246563  0.010353599  0.012445609  0.013713291  0.014465608]
+cox_dev_ratio = [8.352952e-11, 6.681069e-02, 1.319701e-01, 1.602788e-01, 1.746954e-01, 1.828929e-01, 1.957523e-01, 2.007661e-01, 2.024540e-01, 2.030142e-01]
+cox_pred = [4.708706  12.315857; 3.631410  10.503125; 3.372677   9.826971; 3.457956   9.748294; 3.069266   9.092817; 3.492660  10.571210; 2.607252   8.205663; 3.766766  10.586004; 4.358737  11.515610; 3.034568   9.787660; 2.421069   7.314297; 2.702136   8.983869; 3.041029   8.989710; 4.336897  11.830300; 3.936068  11.276023]
+
+cox = glmnet(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda)
+
+@test_approx_eq_eps convert(Array, cox.betas) cox_betas 1e-5
+@test_approx_eq_eps cox.dev_ratio cox_dev_ratio 1e-5
+@test nactive(cox.betas) == [1, 2, 3, 3, 5, 6, 7, 7, 7, 7]
+@test cox.npasses == 391
+@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], [3, 7]) cox_pred 1e-5
+@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], 3, outtype = :risk, offsets = ones(size(dat, 1)))  exp(cox_pred[:, 1]+1.0) 1e-3
+@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], [3, 7], offsets = [1:size(dat, 1)])  cox_pred+repmat(1:size(cox_pred,1), 1, 2) 1e-5
+
+plot(cox)
+plot(cox, Scale.x_log10, Scale.y_log10, y = :absCoefficients, Guide.xlabel("λ"))
+@test_throws ErrorException plot(cox, y = :deviance)
+@test_throws ErrorException plot(cox, x = :coef)
+
+cox_foldid = repmat([1:3], 5);
+coxcv = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda, folds = cox_foldid)
+
+@test_approx_eq_eps coxcv.meanloss [10.75651, 10.81102, 10.79783, 11.78060, 14.97191, 19.59119, 24.63270, 34.80017, 43.99917, 51.85903] 2e-5
+@test_approx_eq_eps lambdamin(coxcv) 0.3879083 1e-6
+@test_approx_eq_eps coef(coxcv) [3.712729e-11, 0, 0, 0, 0, 0, 0] 1e-11
+
+# Make sure show works
+show(IOBuffer(), coxcv)
+show(IOBuffer(), coxcv.path)
+
+
+## Multinomial/multi-class 
+
+iris = DataFrame(
+    SepalLength = [4.4, 5.5, 4.3, 5.1, 4.6, 4.8, 5, 4.8, 5.3, 5.4, 5.6, 6.1, 6.7, 5.6, 6.7, 6, 5.6, 6.3, 6, 6, 7.2, 7.9, 6.4, 6, 6.4, 6.8, 6.3, 7.4, 7.7, 6.1],
+    SepalWidth = [3, 4.2, 3, 3.8, 3.6, 3.4, 3.4, 3, 3.7, 3.4, 3, 2.8, 3.1, 2.9, 3, 2.2, 2.5, 2.3, 3.4, 2.7, 3.6, 3.8, 2.8, 3, 2.8, 3.2, 2.8, 2.8, 2.8, 2.6],
+    PetalLength = [1.3, 1.4, 1.1, 1.6, 1, 1.6, 1.6, 1.4, 1.5, 1.7, 4.5, 4, 4.7, 3.6, 5, 4, 3.9, 4.4, 4.5, 5.1, 6.1, 6.4, 5.6, 4.8, 5.6, 5.9, 5.1, 6.1, 6.7, 5.6],
+    PetalWidth = [0.2, 0.2, 0.1, 0.2, 0.2, 0.2, 0.4, 0.3, 0.2, 0.2, 1.5, 1.3, 1.5, 1.3, 1.7, 1, 1.1, 1.3, 1.6, 1.6, 2.5, 2, 2.2, 1.8, 2.1, 2.3, 1.5, 1.9, 2, 1.4],
+    Species = ["setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica"]
+	);
+multi_model = [10:20:100]
+multi_lambda = [0.1881978818, 0.0292774955, 0.0045546301, 0.0007085529, 0.0001102279]
+multi_dev_ratio = [0.3782633, 0.7807488, 0.8793811, 0.8990554, 0.9031547]
+multi_a0 = [1.6098767  5.165031   9.743992  18.953821  26.07646; -0.4747801  2.715393   4.286069   7.738624  16.51228; -1.1350966 -7.880423 -14.030061 -26.692445 -42.58874]
+mult_beta_30_60 = reshape([0  0; 0.4509928  2.0327613; -1.3688188 -0.9766362; -0.9106487 -4.9704239; 0  1.6995491; -0.2624488 -0.4521692; 0  0; 0  0; 0 0; 0 0; 1.7442735 5.205119; 0.6155112 3.396564], (4, 3, 2));
+multi_folds = [1,1,2,3,3,3,2,1,1,2,1,2,3,2,2,1,2,1,3,3,1,1,3,2,3,2,2,3,1,3]
+multi_meanloss = [2.209918,2.08157,1.957784,1.852986,1.7628,1.684463,1.613146,1.547243,1.481149,1.418856]
+multi_pred = [9.906699e-01 0.009330087 6.008124e-10; 9.906071e-01 0.009392874 1.406847e-09; 6.221072e-03 0.865138076 1.286409e-01; 1.253034e-02 0.982965935 4.503720e-03; 1.029015e-07 0.004818942 9.951810e-01; 4.473380e-07 0.011745014 9.882545e-01]
+
+iris_x = convert(Matrix, iris[:, 1:4])
+iris_y = convert(Vector, iris[:Species])
+iris_lev = sort(unique(iris_y))
+iris_yy = convert(Matrix{Float64}, [i == j for i in iris_y, j in iris_lev])
+
+iris_mod1 = glmnet(iris_x, iris_y)
+iris_mod2 = glmnet(iris_x, iris_yy, Multinomial())
+iris_cv = glmnetcv(iris_x, iris_y, folds = multi_folds)
+iris_cv2 = glmnetcv(iris_x, iris_yy, Multinomial(), folds = multi_folds)
+
+@test_approx_eq iris_mod1.lambda iris_mod2.lambda
+@test_approx_eq iris_mod1.dev_ratio iris_mod2.dev_ratio
+@test_approx_eq iris_mod1.betas iris_mod2.betas
+@test_approx_eq iris_cv.meanloss iris_cv2.meanloss
+@test_approx_eq iris_cv.stdloss iris_cv2.stdloss
+@test_approx_eq iris_cv.nfolds iris_cv2.nfolds
+@test_approx_eq iris_cv.path.dev_ratio  iris_cv2.path.dev_ratio
+@test_approx_eq_eps iris_mod1.lambda[multi_model] multi_lambda 1e-6
+@test_approx_eq_eps iris_mod1.dev_ratio[multi_model] multi_dev_ratio 1e-6
+@test_approx_eq_eps iris_mod1.null_dev 65.91674 2e-5
+@test_approx_eq_eps iris_mod1.a0[:, multi_model] multi_a0 2e-5
+@test_approx_eq_eps iris_mod1.betas[:, :, [30, 60]] mult_beta_30_60 2e-5
+# multi_meanloss comes from R, which does not use a iris_cv.lambda in folds of cross validation
+@test_approx_eq_eps iris_cv.meanloss[1:10] multi_meanloss 1e-2
+@test_approx_eq_eps  predict(iris_mod1, iris_x, 50, outtype = :prob)[1:5:30, :] multi_pred 1e-6
+@test_approx_eq lambdamin(iris_cv) 0.006607988468679545
+@test_approx_eq_eps coef(iris_cv) [0.0 0.509063 0.0; 1.51684 0.0 0.0; -1.41089 0.0 3.51886; -2.84823 0.0 1.79608] 1e-5
+@test nactive(iris_mod1.betas, 8) == 2
+@test nactive(iris_mod1.betas, [7, 92, 100]) == [2, 3, 3]
+
+plot(iris_mod1)
+plot(iris_mod1, x = :dev)
+plot(iris_mod1, x = :norm1, y = :absCoefficients)
+plot(iris_mod2, x = :norm2)
+plot(iris_cv)
+@test_throws ErrorException plot(iris_mod1, y = :deviance)
+@test_throws ErrorException plot(iris_mod2, x = :coef)
+
+# Make sure show works
+show(IOBuffer(), iris_cv)
+show(IOBuffer(), iris_cv.path)
