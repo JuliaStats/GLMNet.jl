@@ -3,9 +3,9 @@ module GLMNet
 using glmnet_jll
 using Distributions, StatsBase
 using Distributed, Printf, Random, SparseArrays
+using DataFrames
 
-
-import Base.getindex, Base.convert, Base.size, Base.show, DataFrames.predict
+import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
 
 struct CompressedPredictorMatrix <: AbstractMatrix{Float64}
@@ -101,7 +101,7 @@ end
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repeat(transpose(path.a0[model]), outer=(sz, 1))
 function predict(path::GLMNetPath, X::AbstractMatrix,
-                 model::Union(Int, AbstractVector{Int})=1:length(path.a0);
+                 model::Union{Int, AbstractVector{Int}}=1:length(path.a0);
                  outtype = :link, offsets = zeros(size(X,1)))
     betas = path.betas
     ca = betas.ca
@@ -123,10 +123,12 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
             y[:, b] += offsets
         end
     end
-    if isa(path, GLMNetPath{Binomial}) && outtype != :link
-        y = 1. ./ (1. + exp(-y))
-    elseif is(path, GLMNetPath{Poisson}) && outtype != :link
-        y = exp(y)
+
+    # Binomial and Poisson need to be transformed
+    if (path isa GLMNetPath{<:Binomial}) && outtype != :link
+        y = 1. ./ (1 .+ exp.(-y))
+    elseif (path isa GLMNetPath{<:Poisson}) && outtype != :link
+        y = exp.(y)
     end
     y
 end
@@ -181,7 +183,7 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
               y::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               lossfun::Loss=devloss(path.family, y),
-              model::Union(Int, AbstractVector{Int})=1:length(path.a0);
+              model::Union{Int, AbstractVector{Int}}=1:length(path.a0);
               offsets = zeros(size(X, 1)))
     validate_x_y_weights(X, y, weights)
     mu = predict(path, X, model; offsets = offsets)
@@ -525,7 +527,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
     y = convert(Array{Float64}, y)
-    offsets = (offsets != nothing)? offsets : isa(family, Multinomial)?  y*0.0 : zeros(size(X, 1))
+    offsets = (offsets != nothing) ? offsets : isa(family, Multinomial) ?  y*0.0 : zeros(size(X, 1))
 
     if isa(family, Normal)
         path = glmnet(X, y, family; weights = weights, kw...)
@@ -599,6 +601,5 @@ end
 
 include("Multinomial.jl")
 include("CoxNet.jl")
-include("plot.jl")
 
 end # module

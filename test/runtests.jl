@@ -103,12 +103,12 @@ path = glmnet(sparse(X), y)
                               17.808632244707766]
 
 # Test plot on path
-plot(path, Scale.x_log10)
-plot(path, x = :deviance)
-plot(path, x = :norm1, y = :absCoefficients)
-plot(path, x = :norm2)
-@test_throws ErrorException plot(path, x = :Coeff)
-@test_throws ErrorException plot(path, y = :Coeff)
+# plot(path, Scale.x_log10)
+# plot(path, x = :deviance)
+# plot(path, x = :norm1, y = :absCoefficients)
+# plot(path, x = :norm2)
+# @test_throws ErrorException plot(path, x = :Coeff)
+# @test_throws ErrorException plot(path, y = :Coeff)
 
 # Cross-validation
 cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
@@ -266,7 +266,7 @@ path = glmnet(sparse(X), yl, Binomial())
                               6.514278565882654,-5.352339338181535,10.448596815251006,
                               -8.571939893775767]
 @test predict(path, X, 60, outtype = :prob, offsets = ones(size(X,1))) ≈
-    1.0 ./ (1.0 + exp(-predict(path, X, 60) - 1))
+    1.0 ./ (1.0 .+ exp.(-predict(path, X, 60) .- 1))
 
 # Cross-validation
 cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
@@ -547,29 +547,25 @@ cox_pred = [4.708706  12.315857; 3.631410  10.503125; 3.372677   9.826971; 3.457
 
 cox = glmnet(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda)
 
-@test_approx_eq_eps convert(Array, cox.betas) cox_betas 1e-5
-@test_approx_eq_eps cox.dev_ratio cox_dev_ratio 1e-5
+@test isapprox(convert(Array, cox.betas), cox_betas, atol=1e-5)
+@test isapprox(cox.dev_ratio, cox_dev_ratio, atol=1e-5)
 @test nactive(cox.betas) == [1, 2, 3, 3, 5, 6, 7, 7, 7, 7]
 @test cox.npasses == 391
-@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], [3, 7]) cox_pred 1e-5
-@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], 3, outtype = :risk, offsets = ones(size(dat, 1)))  exp(cox_pred[:, 1]+1.0) 1e-3
-@test_approx_eq_eps predict(cox, dat[:, 3:size(dat,2)], [3, 7], offsets = [1:size(dat, 1)])  cox_pred+repmat(1:size(cox_pred,1), 1, 2) 1e-5
+@test isapprox(predict(cox, dat[:, 3:size(dat,2)], [3, 7]), cox_pred, atol=1e-5)
+@test isapprox(predict(cox, dat[:, 3:size(dat,2)], 3, outtype = :risk, offsets = ones(size(dat, 1))), exp.(cox_pred[:, 1] .+ 1.0), atol=1e-3)
+@test isapprox(predict(cox, dat[:, 3:size(dat,2)], [3, 7], offsets = 1:size(dat, 1)), cox_pred+repeat(1:size(cox_pred,1), 1, 2), atol=1e-5)
 
-plot(cox)
-plot(cox, Scale.x_log10, Scale.y_log10, y = :absCoefficients, Guide.xlabel("λ"))
-@test_throws ErrorException plot(cox, y = :deviance)
-@test_throws ErrorException plot(cox, x = :coef)
-
-cox_foldid = repmat([1:3], 5);
+cox_foldid = repeat(1:3, 5);
 coxcv = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda, folds = cox_foldid)
 
-@test_approx_eq_eps coxcv.meanloss [10.75651, 10.81102, 10.79783, 11.78060, 14.97191, 19.59119, 24.63270, 34.80017, 43.99917, 51.85903] 2e-5
-@test_approx_eq_eps lambdamin(coxcv) 0.3879083 1e-6
-@test_approx_eq_eps coef(coxcv) [3.712729e-11, 0, 0, 0, 0, 0, 0] 1e-11
+@test isapprox(coxcv.meanloss, [10.75651, 10.81102, 10.79783, 11.78060, 14.97191, 19.59119, 24.63270, 34.80017, 43.99917, 51.85903], atol=2e-5)
+@test isapprox(lambdamin(coxcv), 0.3879083, atol=1e-6)
+@test isapprox(coef(coxcv), [3.712729e-11, 0, 0, 0, 0, 0, 0], atol=1e-11)
 
 # Make sure show works
 show(IOBuffer(), coxcv)
 show(IOBuffer(), coxcv.path)
+end
 
 
 ## Multinomial/multi-class 
@@ -581,7 +577,7 @@ iris = DataFrame(
     PetalWidth = [0.2, 0.2, 0.1, 0.2, 0.2, 0.2, 0.4, 0.3, 0.2, 0.2, 1.5, 1.3, 1.5, 1.3, 1.7, 1, 1.1, 1.3, 1.6, 1.6, 2.5, 2, 2.2, 1.8, 2.1, 2.3, 1.5, 1.9, 2, 1.4],
     Species = ["setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "setosa", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "versicolor", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica", "virginica"]
 	);
-multi_model = [10:20:100]
+multi_model = [10:20:100...]
 multi_lambda = [0.1881978818, 0.0292774955, 0.0045546301, 0.0007085529, 0.0001102279]
 multi_dev_ratio = [0.3782633, 0.7807488, 0.8793811, 0.8990554, 0.9031547]
 multi_a0 = [1.6098767  5.165031   9.743992  18.953821  26.07646; -0.4747801  2.715393   4.286069   7.738624  16.51228; -1.1350966 -7.880423 -14.030061 -26.692445 -42.58874]
@@ -591,7 +587,7 @@ multi_meanloss = [2.209918,2.08157,1.957784,1.852986,1.7628,1.684463,1.613146,1.
 multi_pred = [9.906699e-01 0.009330087 6.008124e-10; 9.906071e-01 0.009392874 1.406847e-09; 6.221072e-03 0.865138076 1.286409e-01; 1.253034e-02 0.982965935 4.503720e-03; 1.029015e-07 0.004818942 9.951810e-01; 4.473380e-07 0.011745014 9.882545e-01]
 
 iris_x = convert(Matrix, iris[:, 1:4])
-iris_y = convert(Vector, iris[:Species])
+iris_y = convert(Vector, iris[!, :Species])
 iris_lev = sort(unique(iris_y))
 iris_yy = convert(Matrix{Float64}, [i == j for i in iris_y, j in iris_lev])
 
@@ -600,33 +596,25 @@ iris_mod2 = glmnet(iris_x, iris_yy, Multinomial())
 iris_cv = glmnetcv(iris_x, iris_y, folds = multi_folds)
 iris_cv2 = glmnetcv(iris_x, iris_yy, Multinomial(), folds = multi_folds)
 
-@test_approx_eq iris_mod1.lambda iris_mod2.lambda
-@test_approx_eq iris_mod1.dev_ratio iris_mod2.dev_ratio
-@test_approx_eq iris_mod1.betas iris_mod2.betas
-@test_approx_eq iris_cv.meanloss iris_cv2.meanloss
-@test_approx_eq iris_cv.stdloss iris_cv2.stdloss
-@test_approx_eq iris_cv.nfolds iris_cv2.nfolds
-@test_approx_eq iris_cv.path.dev_ratio  iris_cv2.path.dev_ratio
-@test_approx_eq_eps iris_mod1.lambda[multi_model] multi_lambda 1e-6
-@test_approx_eq_eps iris_mod1.dev_ratio[multi_model] multi_dev_ratio 1e-6
-@test_approx_eq_eps iris_mod1.null_dev 65.91674 2e-5
-@test_approx_eq_eps iris_mod1.a0[:, multi_model] multi_a0 2e-5
-@test_approx_eq_eps iris_mod1.betas[:, :, [30, 60]] mult_beta_30_60 2e-5
+@test iris_mod1.lambda ≈ iris_mod2.lambda
+@test iris_mod1.dev_ratio ≈ iris_mod2.dev_ratio
+@test iris_mod1.betas ≈ iris_mod2.betas
+@test iris_cv.meanloss ≈ iris_cv2.meanloss
+@test iris_cv.stdloss ≈ iris_cv2.stdloss
+@test iris_cv.nfolds ≈ iris_cv2.nfolds
+@test iris_cv.path.dev_ratio ≈  iris_cv2.path.dev_ratio
+@test isapprox(iris_mod1.lambda[multi_model], multi_lambda, atol=1e-6)
+@test isapprox(iris_mod1.dev_ratio[multi_model], multi_dev_ratio, atol=1e-6)
+@test isapprox(iris_mod1.null_dev, 65.91674, atol=2e-5)
+@test isapprox(iris_mod1.a0[:, multi_model], multi_a0, atol=2e-5)
+@test isapprox(iris_mod1.betas[:, :, [30, 60]], mult_beta_30_60, atol=2e-5)
 # multi_meanloss comes from R, which does not use a iris_cv.lambda in folds of cross validation
-@test_approx_eq_eps iris_cv.meanloss[1:10] multi_meanloss 1e-2
-@test_approx_eq_eps  predict(iris_mod1, iris_x, 50, outtype = :prob)[1:5:30, :] multi_pred 1e-6
-@test_approx_eq lambdamin(iris_cv) 0.006607988468679545
-@test_approx_eq_eps coef(iris_cv) [0.0 0.509063 0.0; 1.51684 0.0 0.0; -1.41089 0.0 3.51886; -2.84823 0.0 1.79608] 1e-5
+@test isapprox(iris_cv.meanloss[1:10], multi_meanloss, atol=1e-2)
+@test isapprox(predict(iris_mod1, iris_x, 50, outtype = :prob)[1:5:30, :], multi_pred, atol=1e-6)
+@test lambdamin(iris_cv) ≈ 0.006607988468679545
+@test isapprox(coef(iris_cv), [0.0 0.509063 0.0; 1.51684 0.0 0.0; -1.41089 0.0 3.51886; -2.84823 0.0 1.79608], atol=1e-5)
 @test nactive(iris_mod1.betas, 8) == 2
 @test nactive(iris_mod1.betas, [7, 92, 100]) == [2, 3, 3]
-
-plot(iris_mod1)
-plot(iris_mod1, x = :dev)
-plot(iris_mod1, x = :norm1, y = :absCoefficients)
-plot(iris_mod2, x = :norm2)
-plot(iris_cv)
-@test_throws ErrorException plot(iris_mod1, y = :deviance)
-@test_throws ErrorException plot(iris_mod2, x = :coef)
 
 # Make sure show works
 show(IOBuffer(), iris_cv)

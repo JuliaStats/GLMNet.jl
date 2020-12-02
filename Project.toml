@@ -3,6 +3,7 @@ uuid = "8d5ece8b-de18-5317-b113-243142960cc6"
 version = "0.5.2"
 
 [deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
