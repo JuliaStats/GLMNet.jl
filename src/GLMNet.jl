@@ -82,7 +82,7 @@ end
 
 function show(io::IO, X::CompressedPredictorMatrix)
     println(io, "$(size(X, 1))x$(size(X, 2)) CompressedPredictorMatrix:")
-    Base.showarray(io, convert(Matrix{Float64}, X); header=false)
+    show(io, convert(Matrix{Float64}, X))
 end
 
 struct GLMNetPath{F<:Distribution}
@@ -516,8 +516,8 @@ function show(io::IO, cv::GLMNetCrossValidation)
 end
 
 function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
-                  family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
-                  offsets::Union(AbstractVector, AbstractMatrix, Nothing)=nothing,
+                  family::Distribution=Normal(); weights::Vector{Float64}=ones(size(y,1)),
+                  offsets::Union{AbstractVector, AbstractMatrix, Nothing}=nothing,
                   rng=Random.GLOBAL_RNG,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin

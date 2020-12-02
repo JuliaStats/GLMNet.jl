@@ -156,7 +156,7 @@ glmnetcv(X, y, nfolds = 3)
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
-show(IOBuffer(), cv.path.betas)
+show(IOBuffer(), cv.path.betas) # this catches the showarray issue
 
 # Passing RNG makes cv deterministic
 cv1 = glmnetcv(X, y)
