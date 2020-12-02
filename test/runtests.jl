@@ -12,8 +12,8 @@ X = [74    1  93  93  79  18
      93   71  76  64  70  91
      30    5  13  89  19  2]
 y = [9, 67, 91, 80, 2, 61, 70, 13, 83, 21]
-
-## LEAST SQUARES
+models = [11, 46, 54]
+@testset "Least squares" begin## LEAST SQUARES
 # True data from R glmnet
 df_true = [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,4,4,5,5,5,5,
            5,5,5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6]
@@ -63,7 +63,6 @@ a0 = [49.7,45.3564158503177,41.3987037450736,37.7925838753477,34.5068217559655,
       20.2237130253272,20.1917640015501,20.1619151307503,20.134518070829,
       20.109500814449,20.0866913936042,20.0659043415446,20.0469628833773]
 # Only check 3 random models; if these are right the rest should be too
-models = [11, 46, 54]
 betas = [0.0000000000000000 -0.26106259863474601 -0.26999306570454373
          0.0000000000000000 -0.03329369198952250 -0.04052553140335470
          0.0000000000000000 -0.08096633358970667 -0.11301841848092280
@@ -167,8 +166,11 @@ cv3 = glmnetcv(X, y; rng=MersenneTwister(1))
 cv4 = glmnetcv(X, y; rng=MersenneTwister(1))
 @test cv3.meanloss ≈ cv4.meanloss
 @test cv3.stdloss ≈ cv4.stdloss
+end
 
-## LOGISTIC
+
+
+@testset "Logistic" begin## LOGISTIC
 yl = [(y .< 50) (y .>= 50)]
 df_true = [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
            1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]
@@ -343,8 +345,11 @@ cv = glmnetcv(X, y, Poisson(); nlambda=2, lambda_min_ratio=0.01)
 
 # Cross-validation with fewer than the total possible number of lambdas converging; doesn't test if the values are correct
 cvShort = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3],maxit=100)
+end
 
-## POISSON
+
+    
+@testset "Poisson" begin ## POISSON
 df_true = [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,4,4,4,4,5,5,
            5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6]
 dev_ratio = [2.10776820091544e-15,0.129499719201302,0.239325227393499,0.332756261637284,
@@ -521,9 +526,9 @@ for j = 1:size(betas, 2), i = 1:size(betas, 1)
     @test betas[1:i, 1:j] == cbetas[1:i, 1:j]
     @test betas[i:end, j:end] == cbetas[i:end, j:end]
 end
+end
 
-
-## Cox model
+@testset "Cox" begin## Cox model
 
 dat = [ 31  1  82  0  0  100   90   413   27
        201  1  73  1  2   70   60  1225  -16
@@ -567,9 +572,7 @@ show(IOBuffer(), coxcv)
 show(IOBuffer(), coxcv.path)
 end
 
-
-## Multinomial/multi-class 
-
+@testset "Multinomial" begin ## Multinomial/multi-class 
 iris = DataFrame(
     SepalLength = [4.4, 5.5, 4.3, 5.1, 4.6, 4.8, 5, 4.8, 5.3, 5.4, 5.6, 6.1, 6.7, 5.6, 6.7, 6, 5.6, 6.3, 6, 6, 7.2, 7.9, 6.4, 6, 6.4, 6.8, 6.3, 7.4, 7.7, 6.1],
     SepalWidth = [3, 4.2, 3, 3.8, 3.6, 3.4, 3.4, 3, 3.7, 3.4, 3, 2.8, 3.1, 2.9, 3, 2.2, 2.5, 2.3, 3.4, 2.7, 3.6, 3.8, 2.8, 3, 2.8, 3.2, 2.8, 2.8, 2.8, 2.6],
@@ -619,3 +622,4 @@ iris_cv2 = glmnetcv(iris_x, iris_yy, Multinomial(), folds = multi_folds)
 # Make sure show works
 show(IOBuffer(), iris_cv)
 show(IOBuffer(), iris_cv.path)
+end
