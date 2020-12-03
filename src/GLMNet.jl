@@ -195,7 +195,7 @@ function show(io::IO, g::GLMNetPath)
     print(io, CoefTable(Union{Vector{Int},Vector{Float64}}[nactive(g.betas), g.dev_ratio, g.lambda], ["df", "pct_dev", "λ"], []))
 end
 
-function check_jerr(jerr, maxit)
+function check_jerr(jerr, maxit, pmax)
     if 0 < jerr < 7777
         error("glmnet: memory allocation error")
     elseif jerr == 7777
@@ -205,7 +205,7 @@ function check_jerr(jerr, maxit)
     elseif -10001 < jerr < 0
         @warn("glmnet: convergence for $(-jerr)th lambda value not reached after $maxit iterations")
     elseif jerr < -10000
-        @warn("glmnet: number of non-zero coefficients along path exceeds $nx at $(maxit+10000)th lambda value")
+        @warn("glmnet: number of non-zero coefficients along path exceeds $pmax at $(maxit+10000)th lambda value")
     end
 end
 
@@ -241,7 +241,7 @@ end
 
 macro check_and_return()
     esc(quote
-        check_jerr(jerr[1], maxit)
+        check_jerr(jerr[1], maxit, pmax)
 
         lmu = lmu[1]
         # first lambda is infinity; changed to entry point
