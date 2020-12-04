@@ -85,10 +85,12 @@ function show(io::IO, X::CompressedPredictorMatrix)
     show(io, convert(Matrix{Float64}, X))
 end
 
-struct GLMNetPath{F<:Distribution}
+# Multinomial, A and B are Arrays
+# Poisson, Normal, Cox, and Binomial A should be a vector, and B should be CompressedPredictorMatrix
+struct GLMNetPath{F<:Distribution, A<:AbstractArray, B<:AbstractArray}
     family::F
-    a0::Vector{Float64}              # intercept values for each solution
-    betas::CompressedPredictorMatrix # coefficient values for each solution
+    a0::A                            # intercept values for each solution
+    betas::B                         # coefficient values for each solution
     null_dev::Float64                # Null deviance of the model
     dev_ratio::Vector{Float64}       # R^2 values for each solution
     lambda::Vector{Float64}          # lamda values corresponding to each solution

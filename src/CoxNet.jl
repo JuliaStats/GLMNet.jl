@@ -1,4 +1,4 @@
-export CoxPH, CoxNetPath, coef, lambdamin
+export CoxPH, coef, lambdamin
 
 struct CoxPH <: ContinuousUnivariateDistribution
     theta::Float64 # risk
@@ -6,16 +6,6 @@ struct CoxPH <: ContinuousUnivariateDistribution
     CoxPH() = CoxPH(0)
 end
 
-
-struct CoxNetPath
-    family::CoxPH
-    a0::Vector{Float64}
-    betas::CompressedPredictorMatrix
-    null_dev::Float64
-    dev_ratio::Vector{Float64}
-    lambda::Vector{Float64}
-    npasses::Int
-end
 
 function CoxDeviance(risk::Array, y::Matrix,
         weights::AbstractVector{Float64}=ones(size(y, 1))) 
@@ -37,9 +27,9 @@ function CoxDeviance(risk::Array, y::Matrix,
 end
 
 
-function predict(path::CoxNetPath, X::AbstractMatrix, 
-        model::Union{Int, AbstractVector{Int}}=1:length(path.lambda); 
-        outtype = :link, offsets = zeros(size(X, 1)))
+function predict(path::GLMNetPath{<:CoxPH}, X::AbstractMatrix,
+        model::Union{Int,AbstractVector{Int}}=1:length(path.lambda);
+        outtype=:link, offsets=zeros(size(X, 1)))
     link = X * path.betas[:, model]
     if any(offsets .!= 0)
         if isa(model, Vector)
@@ -56,24 +46,24 @@ function predict(path::CoxNetPath, X::AbstractMatrix,
 end
 
 
-function loss(path::CoxNetPath, X::AbstractMatrix{Float64},
-        y::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
+function loss(path::GLMNetPath{<:CoxPH}, X::AbstractMatrix{Float64},
+        y::Union{AbstractVector{Float64},AbstractMatrix{Float64}},
         weights::AbstractVector{Float64}=ones(size(y, 1)),
-        model::Union{Int, AbstractVector{Int}}=1:length(path.lambda);
-        offsets = zeros(size(X, 1)))
+        model::Union{Int,AbstractVector{Int}}=1:length(path.lambda);
+        offsets=zeros(size(X, 1)))
     validate_x_y_weights(X, y, weights)
-    risk = exp(predict(path, X, model; offsets = offsets))
+    risk = exp(predict(path, X, model; offsets=offsets))
     devs = CoxDeviance(risk, y, weights)
     return devs ./ sum(y[:, 2])
 end
 
-loss(path::CoxNetPath, X::AbstractMatrix, y::Union{AbstractVector, AbstractMatrix},
-        weights::AbstractVector=ones(size(y, 1)), va...; kw...) = 
-    loss(path, float64(X), float64(y), float64(weights), va...; kw...)
+loss(path::GLMNetPath{<:CoxPH}, X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
+        weights::AbstractVector=ones(size(y, 1)), va...; kw...) =
+    loss(path, Float64(X), Float64(y), Float64(weights), va...; kw...)
 
 modeltype(::CoxPH) = "Cox's Proportional Model"
 
-function show(io::IO, g::CoxNetPath)
+function show(io::IO, g::GLMNetPath{<:CoxPH})
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
     print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
 end
@@ -88,7 +78,7 @@ macro check_and_return_cox()
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        CoxNetPath(family, a0[1:lmu], X, null_dev[1], fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
+        GLMNetPath(family, a0[1:lmu], X, null_dev[1], fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
     end)
 end
 

@@ -1,18 +1,7 @@
 import Distributions.Multinomial
-export LogNetPath
 
 Multinomial() = Multinomial(1, 1)
 modeltype(::Multinomial) = "Multinomial"
-
-struct LogNetPath{F<:Distribution}
-    family::F
-    a0::Array{Float64}
-    betas::Array{Float64}
-    null_dev::Float64
-    dev_ratio::Vector{Float64}
-    lambda::Vector{Float64}
-    npasses::Int
-end
 
 function locSoftmax(xs)
     locMax = maximum(xs)
@@ -20,7 +9,7 @@ function locSoftmax(xs)
     expPart ./ sum(expPart)
 end
 
-function predict(path::LogNetPath, X::AbstractMatrix,
+function predict(path::GLMNetPath{<:Multinomial}, X::AbstractMatrix,
          model::Union{Int, AbstractVector{Int}}=1:length(path.lambda); 
          outtype = :link, offsets = zeros(size(X, 1), size(path.betas, 2)))
     nresp = size(path.betas, 2);
@@ -53,7 +42,7 @@ function MultinomialDeviance(y::Matrix{Float64}, p::Matrix{Float64},
 end
 
 
-function loss(path::LogNetPath, X::AbstractMatrix{Float64},
+function loss(path::GLMNetPath{<:Multinomial}, X::AbstractMatrix{Float64},
               y::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               model::Union{Int, AbstractVector{Int}}=1:length(path.lambda);
@@ -64,7 +53,7 @@ function loss(path::LogNetPath, X::AbstractMatrix{Float64},
 end
 
 
-loss(path::LogNetPath, X::AbstractMatrix, y::Union{AbstractVector, AbstractMatrix}, 
+loss(path::GLMNetPath{<:Multinomial}, X::AbstractMatrix, y::Union{AbstractVector, AbstractMatrix}, 
         weights::AbstractVector=ones(size(y, 1)), va...; kw...) =
     loss(path, convert(Matrix{Float64}, X), 
         convert(Array{Float64}, y),
@@ -79,7 +68,7 @@ nactive(X::Array{Float64, 3}, b::AbstractVector{Int}=1:size(X, 3)) =
     [nactive(X, j) for j in b]
 
 
-function show(io::IO, g::LogNetPath)
+function show(io::IO, g::GLMNetPath{<:Multinomial})
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
     print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
 end
@@ -141,7 +130,7 @@ macro check_and_return_multi()
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         a0 = a0 .- repeat(mean(a0, dims=1), size(a0, 1))
-        LogNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
+        GLMNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
             null_dev[1], fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
     end)
 end
