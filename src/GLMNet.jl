@@ -526,10 +526,13 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
                       n, r = divrem(size(y, 1), nfolds)
                       shuffle!(rng, [repeat(1:nfolds, outer=n); 1:r])
                   end, parallel::Bool=false, kw...)
-    # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
-    y = convert(Array{Float64}, y)
+    if eltype(y) <: Number
+        y = convert(Array{Float64}, y)
+    end
+    # Fit full model once to determine parameters
     offsets = (offsets != nothing) ? offsets : isa(family, Multinomial) ?  y*0.0 : zeros(size(X, 1))
+
 
     if isa(family, Normal)
         path = glmnet(X, y, family; weights = weights, kw...)
