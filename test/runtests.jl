@@ -101,14 +101,6 @@ path = glmnet(sparse(X), y)
                               69.396354069847447,12.253877034216755,81.104769545494065,
                               17.808632244707766]
 
-# Test plot on path
-# plot(path, Scale.x_log10)
-# plot(path, x = :deviance)
-# plot(path, x = :norm1, y = :absCoefficients)
-# plot(path, x = :norm2)
-# @test_throws ErrorException plot(path, x = :Coeff)
-# @test_throws ErrorException plot(path, y = :Coeff)
-
 # Cross-validation
 cv = glmnetcv(X, y; folds=[1,1,1,1,2,2,2,3,3,3])
 @test cv.meanloss ≈ [1196.1831818915,1054.30217435069,882.722957995572,741.473677317198,
