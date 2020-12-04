@@ -199,9 +199,9 @@ glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Multinomial; kw...) =
 glmnet(X::AbstractMatrix, y::AbstractMatrix, family::Multinomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
-const StringVector = Union{Vector{S}} where {S<:String}
+const StringVector = Union{CategoricalArray,Vector{S}} where {S<:Union{String,CategoricalValue}}
 
-function glmnet(X::Matrix{Float64}, y::StringVector; kw...)
+function glmnet(X::Matrix{Float64}, y::Union{StringVector}; kw...)
     lev = sort(unique(y))
     if length(lev) >= 2
         y = convert(Matrix{Float64}, [i == j for i in y, j in lev])

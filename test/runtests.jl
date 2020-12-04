@@ -596,6 +596,12 @@ iris_x = convert(Matrix, iris[:, 1:4])
 iris_y = convert(Vector, iris[!, :Species])
 iris_lev = sort(unique(iris_y))
 iris_yy = convert(Matrix{Float64}, [i == j for i in iris_y, j in iris_lev])
+iris_y_cat = CategoricalArray(iris[!, :Species]) # categorical should be treated
+    # the same way as a string
+
+iris_cv0 = glmnetcv(iris_x, iris_y_cat) # check that it actually treats
+    # categorical as a Multinomial
+@test iris_cv0.path.family isa Multinomial
 
 iris_mod1 = glmnet(iris_x, iris_y)
 iris_mod2 = glmnet(iris_x, iris_yy, Multinomial())
