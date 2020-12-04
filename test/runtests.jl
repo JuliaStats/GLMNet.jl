@@ -570,6 +570,17 @@ coxcv = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda, 
 # Make sure show works
 show(IOBuffer(), coxcv)
 show(IOBuffer(), coxcv.path)
+
+
+# Passing RNG makes cv deterministic
+cv1 = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2])
+cv2 = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2])
+@test cv1.meanloss ≉ cv2.meanloss
+@test cv1.stdloss ≉ cv2.stdloss
+cv3 = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2]; rng=MersenneTwister(1))
+cv4 = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2]; rng=MersenneTwister(1))
+@test cv3.meanloss ≈ cv4.meanloss
+@test cv3.stdloss ≈ cv4.stdloss
 end
 
 @testset "Multinomial" begin ## Multinomial/multi-class 

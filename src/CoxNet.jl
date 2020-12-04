@@ -170,10 +170,11 @@ end
 function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
             family::CoxPH; weights::Vector{Float64}=ones(size(X,1)),
             offsets::Vector{Float64}=zeros(size(X,1)),
+            rng=Random.GLOBAL_RNG,
             grouped = true, nfolds::Int=min(10, div(size(X, 1), 3)),
             folds::Vector{Int}=begin
                 n, r = divrem(size(y, 1), nfolds)
-                shuffle!([repmat(1:nfolds, n); 1:r])
+                shuffle!(rng, [repeat(1:nfolds, n); 1:r])
             end, parallel::Bool=false, kw...)
     # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
