@@ -489,9 +489,9 @@ end
 
 glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
-glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw...) =
+glmnet(X::AbstractMatrix, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), family; kw...)
-glmnet(X::SparseMatrixCSC, y::AbstractVector, family::Distribution=Normal(); kw...) =
+glmnet(X::SparseMatrixCSC, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Vector{Float64}, y), family; kw...)
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
@@ -517,9 +517,10 @@ function show(io::IO, cv::GLMNetCrossValidation)
     print(io, )
 end
 
-function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
-                  family::Distribution=Normal(); weights::Vector{Float64}=ones(size(y,1)),
-                  offsets::Union{AbstractVector, AbstractMatrix, Nothing}=nothing,
+function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractMatrix{<:Number}},
+                  family::Union{<:Normal,<:Multinomial,<:Poisson,<:Binomial}=Normal();
+                  weights::Vector{Float64}=ones(size(y, 1)),
+                  offsets::Union{AbstractVector,AbstractMatrix,Nothing}=nothing,
                   rng=Random.GLOBAL_RNG,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
@@ -568,12 +569,10 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
         loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :], weights[holdoutidx]; 
             offsets = isa(offsets, AbstractVector) ? offsets[holdoutidx] : offsets[holdoutidx, :])
     end
-
-    # each fold may result in a smaller number of lambdas
-    lambda = path.lambda[1:minimum(map(length, fits))]
-    fits = map(z->z[1:length(lambda)], fits)
-
-    fitloss = hcat(fits...)::Matrix{Float64}
+    # Different numbers of lambdas may have converged for each fold, so trim all
+    # loss vectors to the same length before aggregating
+    minLength = minimum(length.(fits))
+    fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64}
 
     ninfold = zeros(Int, nfolds)
     for f in folds
