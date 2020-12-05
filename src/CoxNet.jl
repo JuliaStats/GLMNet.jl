@@ -71,7 +71,7 @@ end
 
 macro check_and_return_cox()
     esc(quote
-        check_jerr(jerr[1], maxit)
+        check_jerr(jerr[1], maxit,pmax)
         lmu = lmu[1]
         # first lambda is infinity; changed to entry point
         if isempty(lambda) && length(alm) > 2
