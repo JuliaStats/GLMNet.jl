@@ -3,7 +3,7 @@ module GLMNet
 using glmnet_jll
 using Distributions, StatsBase
 using Distributed, Printf, Random, SparseArrays
-
+using DataFrames
 
 import Base.getindex, Base.convert, Base.size, Base.show
 export glmnet!, glmnet, nactive, predict, glmnetcv, GLMNetPath, GLMNetCrossValidation, CompressedPredictorMatrix
@@ -82,13 +82,15 @@ end
 
 function show(io::IO, X::CompressedPredictorMatrix)
     println(io, "$(size(X, 1))x$(size(X, 2)) CompressedPredictorMatrix:")
-    Base.showarray(io, convert(Matrix, X); header=false)
+    show(io, convert(Matrix{Float64}, X))
 end
 
-struct GLMNetPath{F<:Distribution}
+# Multinomial, A and B are Arrays
+# Poisson, Normal, Cox, and Binomial A should be a vector, and B should be CompressedPredictorMatrix
+struct GLMNetPath{F<:Distribution, A<:AbstractArray, B<:AbstractArray}
     family::F
-    a0::Vector{Float64}              # intercept values for each solution
-    betas::CompressedPredictorMatrix # coefficient values for each solution
+    a0::A                            # intercept values for each solution
+    betas::B                         # coefficient values for each solution
     null_dev::Float64                # Null deviance of the model
     dev_ratio::Vector{Float64}       # R^2 values for each solution
     lambda::Vector{Float64}          # lamda values corresponding to each solution
@@ -101,7 +103,8 @@ end
 makepredictmat(path::GLMNetPath, sz::Int, model::Int) = fill(path.a0[model], sz)
 makepredictmat(path::GLMNetPath, sz::Int, model::UnitRange{Int}) = repeat(transpose(path.a0[model]), outer=(sz, 1))
 function predict(path::GLMNetPath, X::AbstractMatrix,
-                 model::Union{Int,AbstractVector{Int}}=1:length(path.a0))
+                 model::Union{Int, AbstractVector{Int}}=1:length(path.a0);
+                 outtype = :link, offsets = zeros(size(X,1)))
     betas = path.betas
     ca = betas.ca
     ia = betas.ia
@@ -117,7 +120,18 @@ function predict(path::GLMNetPath, X::AbstractMatrix,
             end
         end
     end
+    if any(offsets .!= 0)
+        for b = 1:length(model)
+            y[:, b] += offsets
+        end
+    end
 
+    # Binomial and Poisson need to be transformed
+    if (path isa GLMNetPath{<:Binomial}) && outtype != :link
+        y = 1. ./ (1 .+ exp.(-y))
+    elseif (path isa GLMNetPath{<:Poisson}) && outtype != :link
+        y = exp.(y)
+    end
     y
 end
 
@@ -171,9 +185,10 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
               y::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
               weights::AbstractVector{Float64}=ones(size(y, 1)),
               lossfun::Loss=devloss(path.family, y),
-              model::Union{Int, AbstractVector{Int}}=1:length(path.a0))
+              model::Union{Int, AbstractVector{Int}}=1:length(path.a0);
+              offsets = zeros(size(X, 1)))
     validate_x_y_weights(X, y, weights)
-    mu = predict(path, X, model)
+    mu = predict(path, X, model; offsets = offsets)
     devs = zeros(size(mu, 2))
     for j = 1:size(mu, 2), i = 1:size(mu, 1)
         devs[j] += loss(lossfun, i, mu[i, j])*weights[i]
@@ -181,13 +196,12 @@ function loss(path::GLMNetPath, X::AbstractMatrix{Float64},
     devs/sum(weights)
 end
 loss(path::GLMNetPath, X::AbstractMatrix, y::Union{AbstractVector, AbstractMatrix},
-     weights::AbstractVector=ones(size(y, 1)), va...) =
+     weights::AbstractVector=ones(size(y, 1)), va...; kw...) =
   loss(path, convert(Matrix{Float64}, X), convert(Array{Float64}, y),
-       convert(Vector{Float64}, weights), va...)
+       convert(Vector{Float64}, weights), va...; kw...)
 
 modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
-modeltype(::Multinomial) = "Multinomial"
 modeltype(::Poisson) = "Poisson"
 
 function show(io::IO, g::GLMNetPath)
@@ -475,9 +489,9 @@ end
 
 glmnet(X::Matrix{Float64}, y::Vector{Float64}, family::Distribution=Normal(); kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
-glmnet(X::AbstractMatrix, y::AbstractVector, family::Distribution=Normal(); kw...) =
+glmnet(X::AbstractMatrix, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Vector{Float64}, y), family; kw...)
-glmnet(X::SparseMatrixCSC, y::AbstractVector, family::Distribution=Normal(); kw...) =
+glmnet(X::SparseMatrixCSC, y::AbstractVector{<:Number}, family::Distribution=Normal(); kw...) =
     glmnet!(convert(SparseMatrixCSC{Float64,Int32}, X), convert(Vector{Float64}, y), family; kw...)
 glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Binomial; kw...) =
     glmnet!(copy(X), copy(y), family; kw...)
@@ -487,7 +501,7 @@ glmnet(X::Matrix, y::Matrix, family::Binomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
 struct GLMNetCrossValidation
-    path::GLMNetPath
+    path::Any
     nfolds::Int
     lambda::Vector{Float64}
     meanloss::Vector{Float64}
@@ -503,18 +517,29 @@ function show(io::IO, cv::GLMNetCrossValidation)
     print(io, )
 end
 
-function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
-                  family::Distribution=Normal(); weights::Vector{Float64}=ones(length(y)),
+function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractMatrix{<:Number}},
+                  family::Union{<:Normal,<:Multinomial,<:Poisson,<:Binomial}=Normal();
+                  weights::Vector{Float64}=ones(size(y, 1)),
+                  offsets::Union{AbstractVector,AbstractMatrix,Nothing}=nothing,
                   rng=Random.GLOBAL_RNG,
                   nfolds::Int=min(10, div(size(y, 1), 3)),
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
                       shuffle!(rng, [repeat(1:nfolds, outer=n); 1:r])
                   end, parallel::Bool=false, kw...)
-    # Fit full model once to determine parameters
     X = convert(Matrix{Float64}, X)
-    y = convert(Array{Float64}, y)
-    path = glmnet(X, y, family; kw...)
+    if eltype(y) <: Number
+        y = convert(Array{Float64}, y)
+    end
+    # Fit full model once to determine parameters
+    offsets = (offsets != nothing) ? offsets : isa(family, Multinomial) ?  y*0.0 : zeros(size(X, 1))
+
+
+    if isa(family, Normal)
+        path = glmnet(X, y, family; weights = weights, kw...)
+    else
+        path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
+    end
 
     # In case user defined folds
     nfolds = maximum(folds)
@@ -532,11 +557,17 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
     fits = (parallel ? pmap : map)(1:nfolds) do i
         f = folds .== i
         holdoutidx = findall(f)
-        modelidx = findall(!, f)
-        g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
-                    weights=weights[modelidx], lambda=path.lambda, kw...)
-        loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :],
-             weights[holdoutidx])
+        modelidx = findall(!,f)
+        if isa(family, Normal)
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                        weights=weights[modelidx], lambda=path.lambda, kw...)
+        else
+            g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
+                        weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :],
+                        lambda=path.lambda, kw...)
+        end
+        loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :], weights[holdoutidx]; 
+            offsets = isa(offsets, AbstractVector) ? offsets[holdoutidx] : offsets[holdoutidx, :])
     end
     # Different numbers of lambdas may have converged for each fold, so trim all
     # loss vectors to the same length before aggregating
@@ -571,4 +602,8 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector,AbstractMatrix},
 
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
 end
+
+include("Multinomial.jl")
+include("CoxNet.jl")
+
 end # module
