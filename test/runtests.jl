@@ -1,5 +1,5 @@
 using GLMNet, Distributions
-using Random, DataFrames, SparseArrays, Test
+using Random, DataFrames, SparseArrays, Test, CategoricalArrays
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
