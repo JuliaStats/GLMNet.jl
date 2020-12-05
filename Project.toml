@@ -1,6 +1,6 @@
 name = "GLMNet"
 uuid = "8d5ece8b-de18-5317-b113-243142960cc6"
-version = "0.5.2"
+version = "0.6.0"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
