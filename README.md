@@ -158,7 +158,7 @@ julia> vline!([lambdamin(iris_cv)])
  - `weights`: A vector of weights for each sample of the same size as `y`.
  - `alpha`: The tradeoff between lasso and ridge regression. This defaults to `1.0`, which specifies a lasso model.
  - `penalty_factor`: A vector of length n of penalties for each predictor in `X`. This defaults to all ones, which weights each predictor equally. To specify that a predictor should be unpenalized, set the corresponding entry to zero.
- - `constraints`: An n x 2 matrix specifying lower bounds (first column) and upper bounds (second column) on each predictor. By default, this is `[-Inf Inf]` for each predictor in `X`.
+ - `constraints`: An 2 x n matrix specifying lower bounds (first line) and upper bounds (second line) on each predictor. By default, this is `[-Inf; Inf]` for each predictor in `X`.
  - `dfmax`: The maximum number of predictors in the largest model.
  - `pmax`: The maximum number of predictors in any model.
  - `nlambda`: The number of values of λ along the path to consider.
