@@ -157,57 +157,6 @@ function glmnet(X::AbstractMatrix, time::AbstractVector,
 end
 
 
-function glmnetcv(X::AbstractMatrix, y::AbstractMatrix,
-            family::CoxPH; weights::Vector{Float64}=ones(size(X,1)),
-            offsets::Vector{Float64}=zeros(size(X,1)),
-            rng=Random.GLOBAL_RNG,
-            grouped = true, nfolds::Int=min(10, div(size(X, 1), 3)),
-            folds::Vector{Int}=begin
-                n, r = divrem(size(y, 1), nfolds)
-                shuffle!(rng, [repeat(1:nfolds, n); 1:r])
-            end, parallel::Bool=false, kw...)
-    # Fit full model once to determine parameters
-    X = convert(Matrix{Float64}, X)
-    y = convert(Matrix{Float64}, y)
-    path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
-
-    # In case user defined folds
-    nfolds = maximum(folds)
-
-    # We shouldn't pass on nlambda and lambda_min_ratio if the user
-    # specified these, since that would make us throw errors, and this
-    # is entirely determined by the lambda values we will pass
-    kw = filter(kw) do akw
-        kwname = akw[1]
-        kwname != :nlambda && kwname != :lambda_min_ratio && kwname != :lambda
-    end
-
-    # Do model fits and compute loss for each
-    fits = (parallel ? pmap : map)(1:nfolds) do i
-        f = folds .== i
-        holdoutidx = findall(f)
-        modelidx = findall(!,f)
-        g = glmnet!(X[modelidx, :], y[modelidx, :], family; weights=weights[modelidx], 
-            offsets = offsets[modelidx], lambda=path.lambda, kw...)
-        #
-        risks = exp.(predict(g, X; offsets = offsets))
-        if grouped
-            plfull = CoxDeviance(risks, y, weights)
-            plminusk = CoxDeviance(risks[modelidx,:], y[modelidx,:], weights[modelidx])
-            plfull - plminusk
-        else
-            CoxDeviance(risks[holdoutidx, :], y[holdoutidx, :], weights[holdoutidx])
-        end
-    end
-
-    fitloss = hcat(fits...)::Matrix{Float64}
-    meanloss = mean(fitloss, dims=2)[:,1]
-    stdloss = std(fitloss, dims=2)[:,1]
-
-    GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
-end
-
-
 function glmnetcv(X::AbstractMatrix, time::Vector, status::Vector, family = CoxPH(); kw...)
     @assert size(X, 1) == length(time) == length(status)
     y = [time status]

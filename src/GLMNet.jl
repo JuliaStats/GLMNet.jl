@@ -517,8 +517,11 @@ function show(io::IO, cv::GLMNetCrossValidation)
     print(io, )
 end
 
+include("Multinomial.jl")
+include("CoxNet.jl")
+
 function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractMatrix{<:Number}},
-                  family::Union{<:Normal,<:Multinomial,<:Poisson,<:Binomial}=Normal();
+                  family::Distribution=Normal();
                   weights::Vector{Float64}=ones(size(y, 1)),
                   offsets::Union{AbstractVector,AbstractMatrix,Nothing}=nothing,
                   rng=Random.GLOBAL_RNG,
@@ -526,7 +529,10 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
                   folds::Vector{Int}=begin
                       n, r = divrem(size(y, 1), nfolds)
                       shuffle!(rng, [repeat(1:nfolds, outer=n); 1:r])
-                  end, parallel::Bool=false, kw...)
+                  end,
+                  parallel::Bool=false,
+                  grouped = true,
+                  kw...)
     X = convert(Matrix{Float64}, X)
     if eltype(y) <: Number
         y = convert(Array{Float64}, y)
@@ -566,8 +572,19 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
                         weights=weights[modelidx], offsets = isa(offsets, AbstractVector) ? offsets[modelidx] : offsets[modelidx, :],
                         lambda=path.lambda, kw...)
         end
-        loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :], weights[holdoutidx]; 
-            offsets = isa(offsets, AbstractVector) ? offsets[holdoutidx] : offsets[holdoutidx, :])
+        if isa(family, CoxPH)
+            risks = exp.(predict(g, X; offsets = offsets))
+            if grouped
+                plfull = CoxDeviance(risks, y, weights)
+                plminusk = CoxDeviance(risks[modelidx,:], y[modelidx,:], weights[modelidx])
+                plfull - plminusk
+            else
+                CoxDeviance(risks[holdoutidx, :], y[holdoutidx, :], weights[holdoutidx])
+            end
+        else
+            loss(g, X[holdoutidx, :], isa(y, AbstractVector) ? y[holdoutidx] : y[holdoutidx, :], weights[holdoutidx];
+                offsets = isa(offsets, AbstractVector) ? offsets[holdoutidx] : offsets[holdoutidx, :])
+        end
     end
     # Different numbers of lambdas may have converged for each fold, so trim all
     # loss vectors to the same length before aggregating
@@ -603,7 +620,5 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
     GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
 end
 
-include("Multinomial.jl")
-include("CoxNet.jl")
 
 end # module
