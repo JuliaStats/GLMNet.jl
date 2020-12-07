@@ -158,6 +158,10 @@ cv3 = glmnetcv(X, y; rng=MersenneTwister(1))
 cv4 = glmnetcv(X, y; rng=MersenneTwister(1))
 @test cv3.meanloss ≈ cv4.meanloss
 @test cv3.stdloss ≈ cv4.stdloss
+
+# Test previously ambiguous definitions
+glmnet(float.(X), y)
+glmnetcv(float.(X), y)
 end
 
 
@@ -340,7 +344,7 @@ cvShort = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3],maxit=100)
 end
 
 
-    
+
 @testset "Poisson" begin ## POISSON
 df_true = [0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,3,4,4,4,4,5,5,
            5,5,5,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6]
@@ -575,7 +579,7 @@ cv4 = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2]; rng=MersenneTwister(1))
 @test cv3.stdloss ≈ cv4.stdloss
 end
 
-@testset "Multinomial" begin ## Multinomial/multi-class 
+@testset "Multinomial" begin ## Multinomial/multi-class
 iris = DataFrame(
     SepalLength = [4.4, 5.5, 4.3, 5.1, 4.6, 4.8, 5, 4.8, 5.3, 5.4, 5.6, 6.1, 6.7, 5.6, 6.7, 6, 5.6, 6.3, 6, 6, 7.2, 7.9, 6.4, 6, 6.4, 6.8, 6.3, 7.4, 7.7, 6.1],
     SepalWidth = [3, 4.2, 3, 3.8, 3.6, 3.4, 3.4, 3, 3.7, 3.4, 3, 2.8, 3.1, 2.9, 3, 2.2, 2.5, 2.3, 3.4, 2.7, 3.6, 3.8, 2.8, 3, 2.8, 3.2, 2.8, 2.8, 2.8, 2.6],
