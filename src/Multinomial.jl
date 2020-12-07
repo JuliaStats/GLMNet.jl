@@ -188,7 +188,7 @@ glmnet(X::Matrix{Float64}, y::Matrix{Float64}, family::Multinomial; kw...) =
 glmnet(X::AbstractMatrix, y::AbstractMatrix, family::Multinomial; kw...) =
     glmnet(convert(Matrix{Float64}, X), convert(Matrix{Float64}, y), family; kw...)
 
-function glmnet(X::Matrix{Float64}, y; kw...)
+function glmnet(X::AbstractMatrix, y; kw...)
     lev = sort(unique(y))
     if length(lev) >= 2
         y = convert(Matrix{Float64}, [i == j for i in y, j in lev])
@@ -202,7 +202,7 @@ function glmnet(X::Matrix{Float64}, y; kw...)
     end
 end
 
-function glmnetcv(X::Matrix{Float64}, y; kw...)
+function glmnetcv(X::AbstractMatrix, y; kw...)
     lev = sort(unique(y))
     if length(lev) >= 2
         y = convert(Matrix{Float64}, [i == j for i in y, j in lev])
