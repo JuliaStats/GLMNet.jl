@@ -105,33 +105,33 @@ macro validate_and_init_multi()
         standardize = Int32(standardize)
         intercept = Int32(intercept)
         maxit = Int32(maxit)
-        null_dev = [0.0]
+        null_dev = Ref(0.0)
         jd = Int32(0)
         #
-        lmu = Int32[0]
+        lmu_ref = Ref{Int32}(0)
         a0 = zeros(Float64, nresp, nlambda)
         ca = zeros(Float64, pmax, nresp, nlambda)
         ia = zeros(Int32, pmax)
         nin = zeros(Int32, nlambda)
         fdev = zeros(Float64, nlambda)
         alm = zeros(Float64, nlambda)
-        nlp = Int32[0]
-        jerr = Int32[0]
+        nlp = Ref{Int32}(0)
+        jerr = Ref{Int32}(0)
     end)
 end
 
 
 macro check_and_return_multi()
     esc(quote
-        check_jerr(jerr[1], maxit,pmax)
-        lmu = lmu[1]
+        check_jerr(jerr[], maxit,pmax)
+        lmu = lmu_ref[]
         # first lambda is infinity; changed to entry point
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         a0 = a0 .- repeat(mean(a0, dims=1), size(a0, 1))
-        GLMNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu], 
-            null_dev[1], fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
+        GLMNetPath(family, a0[:, 1:lmu], ca[sortperm(ia), :, 1:lmu],
+                   null_dev[], fdev[1:lmu], alm[1:lmu], Int(nlp[]))
     end)
 end
 
@@ -160,24 +160,24 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     y = y .* repeat(weights, 1, size(y, 2))
 
     ccall(
-        (:lognet_, libglmnet), Nothing, (
-            Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   , # 1
-            Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   , # 2
-            Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   , Ptr{Int32}   , # 3
-            Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Float64} , # 4
-            Ptr{Int32}     , Ptr{Int32}        , Ptr{Int32}   , Ptr{Int32}   , # 5
-            Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Int32}   , # 6
-            Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , Ptr{Float64} , # 7
-            Ptr{Int32}     , Ptr{Int32}                                        # 8
+        (:lognet_, libglmnet), Cvoid, (
+            Ref{Float64}   , Ref{Int32}        , Ref{Int32}   , Ref{Int32}   , # 1
+            Ref{Float64}   , Ref{Float64}      , Ref{Float64} , Ref{Int32}   , # 2
+            Ref{Float64}   , Ref{Float64}      , Ref{Int32}   , Ref{Int32}   , # 3
+            Ref{Int32}     , Ref{Float64}      , Ref{Float64} , Ref{Float64} , # 4
+            Ref{Int32}     , Ref{Int32}        , Ref{Int32}   , Ref{Int32}   , # 5
+            Ref{Int32}     , Ref{Float64}      , Ref{Float64} , Ref{Int32}   , # 6
+            Ref{Int32}     , Ref{Float64}      , Ref{Float64} , Ref{Float64} , # 7
+            Ref{Int32}     , Ref{Int32}                                        # 8
             ),
-            Ref(alpha)         , Ref(nobs)             , Ref(nvars)       , Ref(nresp)       , # 1
-            X              , y                 , offsets      , Ref(jd)          , # 2
-            penalty_factor , constraints       , Ref(dfmax)       , Ref(pmax)        , # 3
-            Ref(nlambda)       , Ref(lambda_min_ratio) , lambda       , Ref(tol)         , # 4
-            Ref(standardize)   , Ref(intercept)        , Ref(maxit)       , Ref(kopt)        , # 5
-            lmu            , a0                , ca           , ia           , # 6
-            nin            , null_dev          , fdev         , alm          , # 7
-            nlp            , jerr                                              # 8
+            alpha, nobs, nvars, nresp, # 1
+            X, y, offsets, jd, # 2
+            penalty_factor, constraints, dfmax, pmax, # 3
+            nlambda, lambda_min_ratio, lambda, tol, # 4
+            standardize, intercept, maxit, kopt, # 5
+            lmu_ref, a0, ca, ia, # 6
+            nin, null_dev, fdev, alm, # 7
+            nlp, jerr # 8
         )
     @check_and_return_multi
 end
