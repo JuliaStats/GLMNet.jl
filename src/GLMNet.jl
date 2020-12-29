@@ -241,29 +241,30 @@ macro validate_and_init()
             lambda_min_ratio = 2.0
         end
 
-        lmu = Int32[0]
+        null_dev = Ref(0.0)
+        lmu_ref = Ref{Int32}(0)
         a0 = zeros(Float64, nlambda)
         ca = Matrix{Float64}(undef, pmax, nlambda)
         ia = Vector{Int32}(undef, pmax)
         nin = Vector{Int32}(undef, nlambda)
         fdev = Vector{Float64}(undef, nlambda)
         alm = Vector{Float64}(undef, nlambda)
-        nlp = Int32[0]
-        jerr = Int32[0]
+        nlp = Ref{Int32}(0)
+        jerr = Ref{Int32}(0)
     end)
 end
 
 macro check_and_return()
     esc(quote
-        check_jerr(jerr[1], maxit, pmax)
+        check_jerr(jerr[], maxit, pmax)
 
-        lmu = lmu[1]
+        lmu = lmu_ref[]
         # first lambda is infinity; changed to entry point
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        GLMNetPath(family, a0[1:lmu], X, null_dev, fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
+        GLMNetPath(family, a0[1:lmu], X, null_dev[], fdev[1:lmu], alm[1:lmu], Int(nlp[]))
     end)
 end
 
@@ -279,21 +280,23 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
 
-    ccall((:elnet_, libglmnet), Nothing,
-          (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32},
-           Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
-           Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
-           Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+    # Compute null deviance
+    w = StatsBase.weights(weights)
+    mu = mean(y, w)
+    if !intercept
+        mu = zero(mu)
+    end
+    null_dev[] = sum(w) * var(y, w; mean = mu, corrected = false)
+
+    ccall((:elnet_, libglmnet), Cvoid,
+          (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32}),
           (naivealgorithm ? 2 : 1), alpha, size(X, 1), size(X, 2), X, y, weights, 0,
           penalty_factor, constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda, tol,
-          standardize, intercept, maxit, lmu, a0, ca, ia, nin, fdev, alm, nlp, jerr)
-
-    null_dev = 0.0
-    mu = mean(y)
-    for i = 1:length(y)
-        null_dev += abs2(null_dev-mu)
-    end
+          standardize, intercept, maxit, lmu_ref, a0, ca, ia, nin, fdev, alm, nlp, jerr)
 
     @check_and_return
 end
@@ -309,22 +312,24 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
 
-    ccall((:spelnet_, libglmnet), Nothing,
-          (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64},
-           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+    # Compute null deviance
+    w = StatsBase.weights(weights)
+    mu = mean(y, w)
+    if !intercept
+        mu = zero(mu)
+    end
+    null_dev[] = sum(w) * var(y, w; mean = mu, corrected = false)
+
+    ccall((:spelnet_, libglmnet), Cvoid,
+          (Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32}),
           (naivealgorithm ? 2 : 1), alpha, size(X, 1), size(X, 2), X.nzval, X.colptr,
           X.rowval, y, weights, 0, penalty_factor, constraints, dfmax, pmax, nlambda,
-          lambda_min_ratio, lambda, tol, standardize, intercept, maxit, lmu, a0, ca, ia,
+          lambda_min_ratio, lambda, tol, standardize, intercept, maxit, lmu_ref, a0, ca, ia,
           nin, fdev, alm, nlp, jerr)
-
-    null_dev = 0.0
-    mu = mean(y)
-    for i = 1:length(y)
-        null_dev += abs2(null_dev-mu)
-    end
 
     @check_and_return
 end
@@ -350,8 +355,6 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
     offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
-    null_dev = Vector{Float64}(undef, 1)
-
     # The Fortran code expects positive responses in first column, but
     # this convention is evidently unacceptable to the authors of the R
     # code, and, apparently, to us
@@ -362,17 +365,16 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64},
         y[i, 2] = a*weights[i]
     end
 
-    ccall((:lognet_, libglmnet), Nothing,
-          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32},
-           Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
-           Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+    ccall((:lognet_, libglmnet), Cvoid,
+          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32}),
           alpha, size(X, 1), size(X, 2), 1, X, y, copy(offsets), 0, penalty_factor,
           constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda, tol, standardize,
-          intercept, maxit, kopt, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+          intercept, maxit, kopt, lmu_ref, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
 
-    null_dev = null_dev[1]
     @check_and_return
 end
 function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
@@ -396,8 +398,6 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
     offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(size(y, 1)) : copy(offsets)
     length(offsets) == size(y, 1) || error("length of offsets must match length of y")
 
-    null_dev = Vector{Float64}(undef, 1)
-
     # The Fortran code expects positive responses in first column, but
     # this convention is evidently unacceptable to the authors of the R
     # code, and, apparently, to us
@@ -408,19 +408,18 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Matrix{Float64},
         y[i, 2] = a*weights[i]
     end
 
-    ccall((:splognet_, libglmnet), Nothing,
-          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64},
-           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64},
-           Ptr{Float64}, Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Int32}, Ptr{Int32}),
+    ccall((:splognet_, libglmnet), Cvoid,
+          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64},
+           Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}),
           alpha, size(X, 1), size(X, 2), 1, X.nzval, X.colptr, X.rowval, y, copy(offsets),
           0, penalty_factor, constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda,
-          tol, standardize, intercept, maxit, kopt, lmu, a0, ca, ia, nin, null_dev, fdev,
+          tol, standardize, intercept, maxit, kopt, lmu_ref, a0, ca, ia, nin, null_dev, fdev,
           alm, nlp, jerr)
 
-    null_dev = null_dev[1]
     @check_and_return
 end
 
@@ -436,22 +435,20 @@ function glmnet!(X::Matrix{Float64}, y::Vector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    null_dev = Vector{Float64}(undef, 1)
 
     offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
-    ccall((:fishnet_, libglmnet), Nothing,
-          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ref{Int32},
-           Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64}, Ref{Int32},
-           Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32}),
+    ccall((:fishnet_, libglmnet), Cvoid,
+          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32}),
           alpha, size(X, 1), size(X, 2), X, y, offsets, weights, 0, penalty_factor,
           constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda, tol, standardize,
-          intercept, maxit, lmu, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
+          intercept, maxit, lmu_ref, a0, ca, ia, nin, null_dev, fdev, alm, nlp, jerr)
 
-    null_dev = null_dev[1]
     @check_and_return
 end
 function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
@@ -466,24 +463,22 @@ function glmnet!(X::SparseMatrixCSC{Float64,Int32}, y::Vector{Float64},
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
-    null_dev = Vector{Float64}(undef, 1)
 
     offsets::Vector{Float64} = isa(offsets, Nothing) ? zeros(length(y)) : copy(offsets)
     length(offsets) == length(y) || error("length of offsets must match length of y")
 
-    ccall((:spfishnet_, libglmnet), Nothing,
-          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Int32}, Ptr{Int32},
-           Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ref{Float64},
-           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64},
-           Ptr{Int32}, Ptr{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Int32},
-           Ptr{Int32}),
+    ccall((:spfishnet_, libglmnet), Cvoid,
+          (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Int32}, Ref{Int32},
+           Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64},
+           Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32},
+           Ref{Int32}),
           alpha, size(X, 1), size(X, 2), X.nzval, X.colptr, X.rowval, y, offsets, weights,
           0, penalty_factor, constraints, dfmax, pmax, nlambda, lambda_min_ratio, lambda,
-          tol, standardize, intercept, maxit, lmu, a0, ca, ia, nin, null_dev, fdev, alm,
+          tol, standardize, intercept, maxit, lmu_ref, a0, ca, ia, nin, null_dev, fdev, alm,
           nlp, jerr)
 
-    null_dev = null_dev[1]
     @check_and_return
 end
 

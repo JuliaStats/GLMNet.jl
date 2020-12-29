@@ -71,14 +71,14 @@ end
 
 macro check_and_return_cox()
     esc(quote
-        check_jerr(jerr[1], maxit,pmax)
-        lmu = lmu[1]
+        check_jerr(jerr[], maxit, pmax)
+        lmu = lmu_ref[]
         # first lambda is infinity; changed to entry point
         if isempty(lambda) && length(alm) > 2
             alm[1] = exp(2*log(alm[2])-log(alm[3]))
         end
         X = CompressedPredictorMatrix(size(X, 2), ca[:, 1:lmu], ia, nin[1:lmu])
-        GLMNetPath(family, a0[1:lmu], X, null_dev[1], fdev[1:lmu], alm[1:lmu], Int(nlp[1]))
+        GLMNetPath(family, a0[1:lmu], X, null_dev[], fdev[1:lmu], alm[1:lmu], Int(nlp[]))
     end)
 end
 
@@ -109,7 +109,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
     standardize = Int32(standardize);
     intercept = Int32(intercept);
     maxit = Int32(maxit);
-    null_dev = [0.0];
+    null_dev = Ref(0.0)
     jd = Int32(0);
     #
     ca = zeros(Float64, pmax, nlambda) # fitted coef/param
@@ -121,22 +121,22 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
     length(offsets) == length(times) || error("length of offsets must match length of y")
     offsets = copy(offsets)
     #
-    ccall((:coxnet_, libglmnet), Nothing, (
-        Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} , # 1
-        Ptr{Float64} , Ptr{Float64}   , Ptr{Float64}      , Ptr{Float64} , # 2
-        Ptr{Int32}   , Ptr{Float64}   , Ptr{Float64}      , Ptr{Int32}   , # 3
-        Ptr{Int32}   , Ptr{Int32}     , Ptr{Float64}      , Ptr{Float64} , # 4
-        Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Int32}   , # 5
-        Ptr{Float64} , Ptr{Int32}     , Ptr{Int32}        , Ptr{Float64} , # 6
-        Ptr{Float64} , Ptr{Float64}   , Ptr{Int32}        , Ptr{Int32}     # 7
+    ccall((:coxnet_, libglmnet), Cvoid, (
+        Ref{Float64} , Ref{Int32}     , Ref{Int32}        , Ref{Float64} , # 1
+        Ref{Float64} , Ref{Float64}   , Ref{Float64}      , Ref{Float64} , # 2
+        Ref{Int32}   , Ref{Float64}   , Ref{Float64}      , Ref{Int32}   , # 3
+        Ref{Int32}   , Ref{Int32}     , Ref{Float64}      , Ref{Float64} , # 4
+        Ref{Float64} , Ref{Int32}     , Ref{Int32}        , Ref{Int32}   , # 5
+        Ref{Float64} , Ref{Int32}     , Ref{Int32}        , Ref{Float64} , # 6
+        Ref{Float64} , Ref{Float64}   , Ref{Int32}        , Ref{Int32}     # 7
         ),
-        Ref(alpha)       , Ref(nobs)          , Ref(nvars)            , X            , # 1
-        times        , status         , offsets           , weights      , # 2
-        Ref(jd)          , penalty_factor , constraints       , Ref(dfmax)       , # 3
-        Ref(pmax)        , Ref(nlambda)       , Ref(lambda_min_ratio) , lambda       , # 4
-        Ref(tol)         , Ref(maxit)         , Ref(standardize)      , lmu          , # 5
-        ca           , ia             , nin               , null_dev     , # 6
-        fdev         , alm            , nlp               , jerr           # 7
+        alpha, nobs, nvars, X, # 1
+        times, status, offsets, weights, # 2
+        jd, penalty_factor, constraints, dfmax, # 3
+        pmax, nlambda, lambda_min_ratio, lambda, # 4
+        tol, maxit, standardize, lmu_ref, # 5
+        ca, ia, nin, null_dev, # 6
+        fdev, alm, nlp, jerr # 7
         )
     @check_and_return_cox
 end
