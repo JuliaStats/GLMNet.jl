@@ -630,8 +630,8 @@ multi_folds = [1,1,2,3,3,3,2,1,1,2,1,2,3,2,2,1,2,1,3,3,1,1,3,2,3,2,2,3,1,3]
 multi_meanloss = [2.209918,2.08157,1.957784,1.852986,1.7628,1.684463,1.613146,1.547243,1.481149,1.418856]
 multi_pred = [9.906699e-01 0.009330087 6.008124e-10; 9.906071e-01 0.009392874 1.406847e-09; 6.221072e-03 0.865138076 1.286409e-01; 1.253034e-02 0.982965935 4.503720e-03; 1.029015e-07 0.004818942 9.951810e-01; 4.473380e-07 0.011745014 9.882545e-01]
 
-iris_x = convert(Matrix, iris[:, 1:4])
-iris_y = convert(Vector, iris[!, :Species])
+iris_x = Matrix(iris[:, 1:4])
+iris_y = Vector(iris[!, :Species])
 iris_lev = sort(unique(iris_y))
 iris_yy = convert(Matrix{Float64}, [i == j for i in iris_y, j in iris_lev])
 iris_y_cat = CategoricalArray(iris[!, :Species]) # categorical should be treated
