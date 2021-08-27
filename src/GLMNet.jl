@@ -501,6 +501,7 @@ struct GLMNetCrossValidation
     lambda::Vector{Float64}
     meanloss::Vector{Float64}
     stdloss::Vector{Float64}
+    losses::Vector{Vector{Float64}}
 end
 
 function show(io::IO, cv::GLMNetCrossValidation)
@@ -612,7 +613,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
         stdloss[i] = sqrt(stdloss[i]/length(folds)/(nfolds - 1))
     end
 
-    GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss)
+    GLMNetCrossValidation(path, nfolds, path.lambda, meanloss, stdloss, losses)
 end
 
 
