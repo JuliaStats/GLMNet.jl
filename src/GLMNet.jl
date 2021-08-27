@@ -555,7 +555,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
     end
 
     # Do model fits and compute loss for each
-    fits = (parallel ? pmap : map)(1:nfolds) do i
+    losses = (parallel ? pmap : map)(1:nfolds) do i
         f = folds .== i
         holdoutidx = findall(f)
         modelidx = findall(!,f)
@@ -583,8 +583,8 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
     end
     # Different numbers of lambdas may have converged for each fold, so trim all
     # loss vectors to the same length before aggregating
-    minLength = minimum(length.(fits))
-    fitloss = hcat([x[1:minLength] for x in fits]...)::Matrix{Float64}
+    minLength = minimum(length.(losses))
+    fitloss = hcat([x[1:minLength] for x in losses]...)::Matrix{Float64}
 
     ninfold = zeros(Int, nfolds)
     for f in folds
