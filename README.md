@@ -145,34 +145,33 @@ julia> vline!([lambdamin(iris_cv)])
 
 ## Fitting models
 
-`glmnet` has two required parameters: the m x n predictor matrix `X` and the dependent variable `y`. It additionally accepts an optional third argument, `family`, which can be used to specify a generalized linear model. Currently, `Normal()` (least squares, default), `Binomial()` (logistic), `Poisson()` , `Multinomial()`, `CoxPH()` (Cox model) are supported. 
+`glmnet` has two required parameters: the n x m predictor matrix `X` and the dependent variable `y`. It additionally accepts an optional third argument, `family`, which can be used to specify a generalized linear model. Currently, `Normal()` (least squares, default), `Binomial()` (logistic), `Poisson()` , `Multinomial()`, `CoxPH()` (Cox model) are supported. 
 
-- For linear and Poisson models, `y` is a numerical vector.
-- For logistic models, `y` is either a string vector or a m x 2 matrix, where the first column is the count of negative responses for each row in `X` and the second column is the count of positive responses. 
-- For multinomial models, `y` is etiher a string vector (with at least 3 unique values) or a m x k matrix, where k is number of unique values (classes).
-- For Cox models, `y` is a 2-column matrix, where the first column is survival time and second column is (right) censoring status. Indeed, For survival data, `glmnet` has another method `glmnet(X::Matrix, time::Vector, status::Vector)`. Same for `glmnetcv`.
+- For linear and Poisson models, `y` is a numerical vector of length n.
+- For logistic models, `y` is either a string vector of length n or a n x 2 matrix, where the first column is the count of negative responses for each row in `X` and the second column is the count of positive responses. 
+- For multinomial models, `y` is either a string vector (with at least 3 unique values) or a n x k matrix, where k is the number of unique values (classes).
+- For Cox models, `y` is a n x 2 matrix, where the first column is survival time and the second column is (right) censoring status. Note that for survival data, `glmnet` has another method `glmnet(X::Matrix, time::Vector, status::Vector)` (`glmnetcv` has a corresponding method as well).
 
 
-`glmnet` also accepts many optional keyword parameters, described below:
+`glmnet` also accepts many optional keyword parameters as described below:
 
- - `weights`: A vector of weights for each sample of the same size as `y`.
+ - `weights`: A vector of length n of weights.
  - `alpha`: The tradeoff between lasso and ridge regression. This defaults to `1.0`, which specifies a lasso model.
- - `penalty_factor`: A vector of length n of penalties for each predictor in `X`. This defaults to all ones, which weights each predictor equally. To specify that a predictor should be unpenalized, set the corresponding entry to zero.
- - `constraints`: An 2 x n matrix specifying lower bounds (first line) and upper bounds (second line) on each predictor. By default, this is `[-Inf; Inf]` for each predictor in `X`.
+ - `penalty_factor`: A vector of length m of penalties for each predictor/column in `X`. This defaults to all ones, which weighs each predictor equally. To unpenalize a predictor, set the corresponding entry to zero.
+ - `constraints`: A 2 x m matrix specifying lower bounds (first row) and upper bounds (second row) of the predictors. By default, this is `[-Inf; Inf]` for each predictor in `X`.
  - `dfmax`: The maximum number of predictors in the largest model.
  - `pmax`: The maximum number of predictors in any model.
  - `nlambda`: The number of values of λ along the path to consider.
- - `lambda_min_ratio`: The smallest λ value to consider, as a ratio of the value of λ that gives the null model (i.e., the model with only an intercept). If the number of observations exceeds the number of variables, this defaults to `0.0001`, otherwise `0.01`.
+ - `lambda_min_ratio`: The smallest λ value to consider, as a ratio of the λ value that gives the null model (i.e., the model with only an intercept). If the number of observations (n) exceeds the number of variables (m), this defaults to `0.0001`, otherwise `0.01`.
  - `lambda`: The λ values to consider. By default, this is determined from `nlambda` and `lambda_min_ratio`.
- - `tol`: Convergence criterion. Defaults to `1e-7`.
- - `standardize`: Whether to standardize predictors so that they are in the same units. Defaults to `true`. Beta values are always presented on the original scale.
- - `intercept`: Whether to fit an intercept term. The intercept is always unpenalized. Defaults to `true`.
- - `maxit`: The maximum number of iterations of the cyclic coordinate descent algorithm. If convergence is not achieved, a warning is returned.
+ - `tol`: Convergence criterion, with the default value of `1e-7`.
+ - `standardize`: Whether to standardize predictors so that they are in the same units, with the default value of `true`. Beta values are always presented on the original scale.
+ - `intercept`: Whether to fit an intercept term. The intercept is always unpenalized. The default value is `true`.
+ - `maxit`: The maximum number of iterations of the cyclic coordinate descent algorithm. If convergence is not achieved, a warning is returned. The default value is `1e6`.
 
 
 ## See also
 
  - [Lasso.jl](https://github.com/simonster/Lasso.jl), a pure Julia implementation of the glmnet coordinate descent algorithm that often achieves better performance.
- - [LARS.jl](https://github.com/simonster/LARS.jl), an implementation
-   of least angle regression for fitting entire linear (but not
+ - [LARS.jl](https://github.com/simonster/LARS.jl), an implementation of least angle regression for fitting entire linear (but not
    generalized linear) Lasso and Elastic Net coordinate paths.
