@@ -145,7 +145,7 @@ julia> vline!([lambdamin(iris_cv)])
 
 ## Fitting models
 
-`glmnet` has two required parameters: the n x m predictor matrix `X` and the dependent variable `y`. It additionally accepts an optional third argument, `family`, which can be used to specify a generalized linear model. Currently, `Normal()` (least squares, default), `Binomial()` (logistic), `Poisson()` , `Multinomial()`, `CoxPH()` (Cox model) are supported. 
+`glmnet` has two required parameters: the n x m predictor matrix `X` and the dependent variable `y`. It additionally accepts an optional third argument, `family`, which can be used to specify a generalized linear model. Currently, `Normal()` (least squares, default), `MvNormal()` Multi-response gaussian, `Binomial()` (logistic), `Poisson()` , `Multinomial()`, `CoxPH()` (Cox model) are supported. 
 
 - For linear and Poisson models, `y` is a numerical vector of length n.
 - For logistic models, `y` is either a string vector of length n or a n x 2 matrix, where the first column is the count of negative responses for each row in `X` and the second column is the count of positive responses. 
@@ -166,6 +166,7 @@ julia> vline!([lambdamin(iris_cv)])
  - `lambda`: The λ values to consider. By default, this is determined from `nlambda` and `lambda_min_ratio`.
  - `tol`: Convergence criterion, with the default value of `1e-7`.
  - `standardize`: Whether to standardize predictors so that they are in the same units, with the default value of `true`. Beta values are always presented on the original scale.
+ - `standardize_response`: (only for `MvNormal()`), Whether to standardize the response variables so that they are the same units. defaults to `false`.
  - `intercept`: Whether to fit an intercept term. The intercept is always unpenalized. The default value is `true`.
  - `maxit`: The maximum number of iterations of the cyclic coordinate descent algorithm. If convergence is not achieved, a warning is returned. The default value is `1e6`.
 
