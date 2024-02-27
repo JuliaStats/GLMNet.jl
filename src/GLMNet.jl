@@ -235,7 +235,7 @@ macro validate_and_init()
         if !isempty(lambda)
             # user-specified lambda values
             nlambda == 100 || error("cannot specify both lambda and nlambda")
-            lambda_min_ratio == (length(y) < size(X, 2) ? 1e-2 : 1e-4) ||
+            lambda_min_ratio == (size(y, 1) < size(X, 2) ? 1e-2 : 1e-4) ||
                 error("cannot specify both lambda and lambda_min_ratio")
             nlambda = length(lambda)
             lambda_min_ratio = 2.0
@@ -514,6 +514,7 @@ function show(io::IO, cv::GLMNetCrossValidation)
 end
 
 include("Multinomial.jl")
+include("MultiResponseNet.jl")
 include("CoxNet.jl")
 
 function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractMatrix{<:Number}},
@@ -534,10 +535,10 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
         y = convert(Array{Float64}, y)
     end
     # Fit full model once to determine parameters
-    offsets = (offsets != nothing) ? offsets : isa(family, Multinomial) ?  y*0.0 : zeros(size(X, 1))
+    offsets = (offsets != nothing) ? offsets : isa(family, Union{Multinomial, MvNormal}) ?  y*0.0 : zeros(size(X, 1))
 
 
-    if isa(family, Normal)
+    if isa(family, Union{Normal, MvNormal})
         path = glmnet(X, y, family; weights = weights, kw...)
     else
         path = glmnet(X, y, family; weights = weights, offsets = offsets, kw...)
@@ -560,7 +561,7 @@ function glmnetcv(X::AbstractMatrix, y::Union{AbstractVector{<:Number},AbstractM
         f = folds .== i
         holdoutidx = findall(f)
         modelidx = findall(!,f)
-        if isa(family, Normal)
+        if isa(family, Union{Normal, MvNormal})
             g = glmnet!(X[modelidx, :], isa(y, AbstractVector) ? y[modelidx] : y[modelidx, :], family;
                         weights=weights[modelidx], lambda=path.lambda, kw...)
         else

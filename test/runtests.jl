@@ -1,5 +1,6 @@
 using GLMNet, Distributions
 using Random, DataFrames, SparseArrays, Test, CategoricalArrays
+using CSV
 
 X = [74    1  93  93  79  18
      98   36   2  27  65  70
@@ -669,4 +670,59 @@ iris_cv2 = glmnetcv(iris_x, iris_yy, Multinomial(), folds = multi_folds)
 # Make sure show works
 show(IOBuffer(), iris_cv)
 show(IOBuffer(), iris_cv.path)
+end
+
+@testset "MvNormal" begin
+
+    # read mgaussian example
+    X = Matrix(CSV.read("mgaussianexample/X.csv", DataFrame)[:, 2:end])
+    Y = Matrix(CSV.read("mgaussianexample/Y.csv", DataFrame)[:, 2:end])
+
+    # fit and make predictions
+    path = glmnet(X, Y, MvNormal())
+    preds = predict(path, X)
+
+    # read in values from R version
+    R_a0 = Matrix(CSV.read("mgaussianexample/a0.csv", DataFrame)[:, 2:end])
+    R_lambda = Matrix(CSV.read("mgaussianexample/lambda.csv", DataFrame)[:, 2:end])
+    R_devratio = Matrix(CSV.read("mgaussianexample/dev.ratio.csv", DataFrame)[:, 2:end])
+    R_betas1 = Matrix(CSV.read("mgaussianexample/beta.1.csv", DataFrame)[:, 2:end])
+    R_betas2 = Matrix(CSV.read("mgaussianexample/beta.2.csv", DataFrame)[:, 2:end])
+    R_betas3 = Matrix(CSV.read("mgaussianexample/beta.3.csv", DataFrame)[:, 2:end])
+    R_betas4 = Matrix(CSV.read("mgaussianexample/beta.4.csv", DataFrame)[:, 2:end])
+    R_preds1 = Matrix(CSV.read("mgaussianexample/preds.1.csv", DataFrame)[:, 2:end])
+    R_preds2 = Matrix(CSV.read("mgaussianexample/preds.2.csv", DataFrame)[:, 2:end])
+    R_preds3 = Matrix(CSV.read("mgaussianexample/preds.3.csv", DataFrame)[:, 2:end])
+    R_preds4 = Matrix(CSV.read("mgaussianexample/preds.4.csv", DataFrame)[:, 2:end])
+
+    # test 
+    @test path.dev_ratio ≈ R_devratio
+    @test path.betas[:, 1, :] ≈ R_betas1
+    @test path.betas[:, 2, :] ≈ R_betas2
+    @test path.betas[:, 3, :] ≈ R_betas3
+    @test path.betas[:, 4, :] ≈ R_betas4
+    @test preds[:, 1, :] ≈ R_preds1
+    @test preds[:, 2, :] ≈ R_preds2
+    @test preds[:, 3, :] ≈ R_preds3
+    @test preds[:, 4, :] ≈ R_preds4
+    @test path.lambda ≈ R_lambda
+    @test path.a0 ≈ R_a0
+
+    # fit sparse array
+    path = glmnet(sparse(X), Y, MvNormal())
+    preds = predict(path, X)
+
+    # test 
+    @test path.dev_ratio ≈ R_devratio
+    @test path.betas[:, 1, :] ≈ R_betas1
+    @test path.betas[:, 2, :] ≈ R_betas2
+    @test path.betas[:, 3, :] ≈ R_betas3
+    @test path.betas[:, 4, :] ≈ R_betas4
+    @test preds[:, 1, :] ≈ R_preds1
+    @test preds[:, 2, :] ≈ R_preds2
+    @test preds[:, 3, :] ≈ R_preds3
+    @test preds[:, 4, :] ≈ R_preds4
+    @test path.lambda ≈ R_lambda
+    @test path.a0 ≈ R_a0
+
 end
