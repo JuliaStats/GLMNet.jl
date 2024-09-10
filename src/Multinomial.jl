@@ -62,14 +62,14 @@ loss(path::GLMNetPath{<:Multinomial}, X::AbstractMatrix, y::Union{AbstractVector
 
 # Get number of active predictors for a model in X
 # nin can be > non-zero predictors under some circumstances...
-nactive(X::Array{Float64, 3}, b::Int) = sum(sum(X[:,:,b] .!= 0., dims=1) .> 0)
+nactive(X::Array{Float64, 3}, b::Int; dims=1) = sum(sum(X[:,:,b] .!= 0., dims=dims) .> 0)
 
 nactive(X::Array{Float64, 3}, b::AbstractVector{Int}=1:size(X, 3)) =
     [nactive(X, j) for j in b]
 
 
 function show(io::IO, g::GLMNetPath{<:Multinomial})
-    println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
+    println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 3)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
     print(io, DataFrame(df=nactive(g.betas), pct_dev=g.dev_ratio, λ=g.lambda))
 end
 
@@ -86,7 +86,7 @@ macro validate_and_init_multi()
         if !isempty(lambda)
             # user-specified lambda values
             nlambda == 100 || error("cannot specify both lambda and nlambda")
-            lambda_min_ratio == (length(y) < size(X, 2) ? 1e-2 : 1e-4) ||
+            lambda_min_ratio == (size(y, 1) < size(X, 2) ? 1e-2 : 1e-4) ||
                 error("cannot specify both lambda and lambda_min_ratio")
             nlambda = length(lambda)
             lambda_min_ratio = 2.0

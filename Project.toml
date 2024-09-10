@@ -1,6 +1,6 @@
 name = "GLMNet"
 uuid = "8d5ece8b-de18-5317-b113-243142960cc6"
-version = "0.7.2"
+version = "0.7.3"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -22,6 +22,8 @@ julia = "1.6"
 [extras]
 CategoricalArrays = "324d7699-5711-5eae-9e2f-1d82baa6b597"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+
 
 [targets]
-test = ["Test", "CategoricalArrays"]
+test = ["Test", "CategoricalArrays", "CSV"]
