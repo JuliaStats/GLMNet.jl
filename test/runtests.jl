@@ -189,6 +189,12 @@ cv4 = glmnetcv(X, y; rng=MersenneTwister(1))
 # Test previously ambiguous definitions
 glmnet(float.(X), y)
 glmnetcv(float.(X), y)
+
+# Check for issue #72
+nobs = size(X, 2) - 1
+glmnetcv(X[1:nobs, :], y[1:nobs], nfolds=2)
+nobs = size(X, 2) + 1
+glmnetcv(X[1:nobs, :], y[1:nobs], nfolds=2)
 end
 
 
@@ -354,6 +360,12 @@ cv = glmnetcv(X, yl, Binomial(); folds=[1,1,1,1,2,2,2,3,3,3])
 # Make sure show works
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
+
+# Check for issue #72
+nobs = size(X, 2) - 1
+glmnetcv(X[1:nobs, :], yl[1:nobs, :], Binomial(), nfolds=2)
+nobs = size(X, 2) + 1
+glmnetcv(X[1:nobs, :], yl[1:nobs, :], Binomial(), nfolds=2)
 
 # Passing RNG makes cv deterministic
 cv1 = glmnetcv(X, yl, Binomial())
@@ -532,6 +544,12 @@ cv = glmnetcv(X, y, Poisson(); folds=[1,1,1,1,2,2,2,3,3,3])
 show(IOBuffer(), cv)
 show(IOBuffer(), cv.path)
 
+# Check for issue #72
+nobs = size(X, 2) - 1
+glmnetcv(X[1:nobs, :], y[1:nobs], Poisson(), nfolds=2)
+nobs = size(X, 2) + 1
+glmnetcv(X[1:nobs, :], y[1:nobs], Poisson(), nfolds=2)
+
 # Passing RNG makes cv deterministic
 cv1 = glmnetcv(X, y, Poisson())
 cv2 = glmnetcv(X, y, Poisson())
@@ -602,6 +620,12 @@ coxcv = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2], lambda = cox_lambda, 
 show(IOBuffer(), coxcv)
 show(IOBuffer(), coxcv.path)
 
+# Check for issue #72
+X = dat[:,3:size(dat,2)]
+nobs = size(X, 2) - 1
+glmnetcv(X[1:nobs, :], dat[1:nobs,1], dat[1:nobs,2], nfolds=2)
+nobs = size(X, 2) + 1
+glmnetcv(X[1:nobs, :], dat[1:nobs,1], dat[1:nobs,2], nfolds=2)
 
 # Passing RNG makes cv deterministic
 cv1 = glmnetcv(dat[:,3:size(dat,2)], dat[:,1], dat[:,2])
@@ -670,6 +694,13 @@ iris_cv2 = glmnetcv(iris_x, iris_yy, Multinomial(), folds = multi_folds)
 # Make sure show works
 show(IOBuffer(), iris_cv)
 show(IOBuffer(), iris_cv.path)
+
+# Check for issue #72
+X = [iris_x iris_x]
+nobs = size(X, 2) - 1
+glmnetcv(X[1:nobs, :], iris_yy[1:nobs, :], Multinomial(), nfolds=2)
+nobs = size(X, 2) + 1
+glmnetcv(X[1:nobs, :], iris_yy[1:nobs, :], Multinomial(), nfolds=2)
 end
 
 @testset "MvNormal" begin
@@ -724,5 +755,11 @@ end
     @test preds[:, 4, :] ≈ R_preds4
     @test path.lambda ≈ R_lambda
     @test path.a0 ≈ R_a0
+
+    # Check for issue #72
+    nobs = size(X, 2) - 1
+    glmnetcv(X[1:nobs, :], Y[1:nobs, :], MvNormal())
+    nobs = size(X, 2) + 1
+    glmnetcv(X[1:nobs, :], Y[1:nobs, :], MvNormal())
 
 end

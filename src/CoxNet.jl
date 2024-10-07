@@ -91,7 +91,7 @@ function glmnet!(X::Matrix{Float64}, y::Matrix{Float64}, family::CoxPH;
              constraints::Array{Float64, 2}=[x for x in (-Inf, Inf), y in 1:size(X, 2)],
              dfmax::Int=size(X, 2)+1, pmax::Int=min(dfmax*2+20, size(X, 2)), 
              nlambda::Int=100,
-             lambda_min_ratio::Real=(length(y) < size(X, 2) ? 1e-2 : 1e-4),
+             lambda_min_ratio::Real=(size(y, 1) < size(X, 2) ? 1e-2 : 1e-4),
              lambda::Vector{Float64}=Float64[], tol::Real=1e-7, standardize::Bool=true,
              intercept::Bool=true, maxit::Int=1000000)
     @validate_and_init
