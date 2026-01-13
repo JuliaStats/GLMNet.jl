@@ -17,11 +17,10 @@ jobs:
           - version: 1
             os: 'windows-latest'
     steps:
-      - uses: actions/checkout@v2
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
       - uses: actions/cache@v5
         env:
           cache-name: cache-artifacts
@@ -33,15 +32,12 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@latest
-      - run: |
-          git config --global user.name Tester
-          git config --global user.email te@st.er
-      - uses: julia-actions/julia-runtest@latest
-        continue-on-error: ${{ matrix.version == 'nightly' }}
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v1
+      - uses: codecov/codecov-action@v5
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.version == '1' }}
         with:
           file: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
 #   docs:
 #     name: Documentation
 #     runs-on: ubuntu-latest
