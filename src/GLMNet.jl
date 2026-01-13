@@ -204,9 +204,9 @@ modeltype(::Normal) = "Least Squares"
 modeltype(::Binomial) = "Logistic"
 modeltype(::Poisson) = "Poisson"
 
-function show(io::IO, g::GLMNetPath)
+function show(io::IO, ::MIME"text/plain", g::GLMNetPath)
     println(io, "$(modeltype(g.family)) GLMNet Solution Path ($(size(g.betas, 2)) solutions for $(size(g.betas, 1)) predictors in $(g.npasses) passes):")
-    print(io, CoefTable(Union{Vector{Int},Vector{Float64}}[nactive(g.betas), g.dev_ratio, g.lambda], ["df", "pct_dev", "λ"], []))
+    show(io, MIME"text/plain"(), CoefTable(Union{Vector{Int},Vector{Float64}}[nactive(g.betas), g.dev_ratio, g.lambda], ["df", "pct_dev", "λ"], []))
 end
 
 function check_jerr(jerr, maxit, pmax)
